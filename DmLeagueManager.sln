@@ -1,0 +1,25 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.14.36804.6 d17.14
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DmLeagueManager", "DmLeagueManager\DmLeagueManager.csproj", "{56443AD5-9290-4CB7-B0D0-592B91F5BA64}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{56443AD5-9290-4CB7-B0D0-592B91F5BA64}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{56443AD5-9290-4CB7-B0D0-592B91F5BA64}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{56443AD5-9290-4CB7-B0D0-592B91F5BA64}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{56443AD5-9290-4CB7-B0D0-592B91F5BA64}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {F122D078-5FCF-4239-B068-FED2E90FC1AC}
+	EndGlobalSection
+EndGlobal

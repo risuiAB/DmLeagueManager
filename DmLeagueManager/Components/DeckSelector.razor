@@ -1,0 +1,100 @@
+@* デッキ選択コンポーネント
+   今シーズン使用済み / プレイヤー全履歴 / 新規入力 を切り替えて選択できる *@
+
+<div class="deck-selector">
+
+    <!-- タブ切り替え -->
+    <div class="deck-selector-tabs">
+        <button class="deck-tab @(mode == "season" ? "active" : "")" @onclick="SetModeSeason">今シーズン</button>
+        <button class="deck-tab @(mode == "all" ? "active" : "")" @onclick="SetModeAll">全履歴</button>
+        <button class="deck-tab @(mode == "new" ? "active" : "")" @onclick="SetModeNew">新規入力</button>
+    </div>
+    <!-- 今シーズンのデッキ一覧 -->
+    @if (mode == "season")
+    {
+        @if (!SeasonDecks.Any())
+        {
+            <div class="deck-empty">今シーズンはまだデッキがありません</div>
+        }
+        else
+        {
+            <div class="deck-list">
+                @foreach (var deck in SeasonDecks)
+                {
+                    <div class="deck-select-item @(SelectedDeckId == deck.Id ? "selected" : "")"
+                         @onclick="async () => 
+                         {
+                             if(deck.IsActive){
+                                await SelectDeck(deck.Id);
+                             }
+                         }">
+                        <span>@deck.Name</span>
+                        <span style="font-size:11px; color:@(deck.IsActive ? "var(--win)" : "var(--lose)")">
+                            @(deck.IsActive ? "使用可" : "消滅済")
+                        </span>
+                    </div>
+                }
+            </div>
+        }
+    }
+
+    <!-- 全履歴デッキ一覧 -->
+    @if (mode == "all")
+    {
+        @if (!AllDecks.Any())
+        {
+            <div class="deck-empty">デッキ履歴がありません</div>
+        }
+        else
+        {
+            <div class="deck-list">
+                @foreach (var deck in AllDecks.Where(d=>d.IsActive))
+                {
+                    <div class="deck-select-item @(SelectedDeckId == deck.Id ? "selected" : "")"
+                         @onclick="() => SelectDeck(deck.Id)">
+                        <span>@deck.Name</span>
+                    </div>
+                }
+            </div>
+        }
+    }
+
+    <!-- 新規入力 -->
+    @if (mode == "new")
+    {
+        <input class="text-input"
+               style="margin-top:8px; margin-bottom:0;"
+               placeholder="デッキ名を入力"
+               value="@newName"
+               @oninput="OnNewNameInput" />
+    }
+
+</div>
+
+@code {
+    [Parameter] public List<Deck> SeasonDecks { get; set; } = new();
+    [Parameter] public List<Deck> AllDecks { get; set; } = new();
+    [Parameter] public int SelectedDeckId { get; set; }
+    [Parameter] public EventCallback<int> OnDeckSelected { get; set; }
+    [Parameter] public EventCallback<string> OnNewDeckName { get; set; }
+
+    private string mode = "season";
+    private string newName = "";
+
+    private async Task SelectDeck(int id)
+    {
+        await OnDeckSelected.InvokeAsync(id);
+        await OnNewDeckName.InvokeAsync("");
+    }
+
+    private async Task OnNewNameInput(ChangeEventArgs e)
+    {
+        newName = e.Value?.ToString() ?? "";
+        await OnDeckSelected.InvokeAsync(0);
+        await OnNewDeckName.InvokeAsync(newName);
+    }
+
+    private void SetModeSeason() => mode = "season";
+    private void SetModeAll() => mode = "all";
+    private void SetModeNew() => mode = "new";
+}

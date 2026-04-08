@@ -1,0 +1,134 @@
+@page "/matches"
+@using DmLeagueManager.Models
+@using DmLeagueManager.Services
+@inject SeasonService SeasonService
+@inject TournamentService TournamentService
+@inject MatchService MatchService
+@inject PlayerService PlayerService
+@inject DeckService DeckService
+
+<PageTitle>試合ログ - DM League Manager</PageTitle>
+
+<div class="section-title">試合ログ</div>
+
+@if (loading)
+{
+    <div class="loading">読み込み中...</div>
+}
+else
+{
+    <!-- 大会切り替え -->
+    @if (allTournaments.Any())
+    {
+        <div class="player-tabs" style="margin-bottom:16px">
+            @foreach (var t in allTournaments)
+            {
+                <button class="player-tab-btn @(selectedTournamentId == t.Id ? "active" : "")"
+                        @onclick="() => SelectTournament(t)">
+                    @t.Name @(t.IsActive ? "🔴" : "")
+                </button>
+            }
+        </div>
+    }
+
+    <div class="match-log">
+        <div class="match-log-header">
+            <span class="fw-bold">@(selectedTournament?.Name ?? "試合記録")</span>
+            <span class="text-dim">@matches.Count 試合</span>
+        </div>
+
+        @foreach (var m in matches)
+        {
+            var winner = playerMap.GetValueOrDefault(m.WinnerPlayerId);
+            var loser = playerMap.GetValueOrDefault(m.LoserPlayerId);
+            var winnerDeck = deckMap.GetValueOrDefault(m.WinnerDeckId);
+            var lostDeck = deckMap.GetValueOrDefault(m.LostDeckId);
+
+            <div class="match-item" style="flex-direction:column; align-items:stretch; gap:6px;">
+                <!-- 試合情報行 -->
+                <div style="display:flex; align-items:center; gap:10px;">
+                    <div class="match-time">
+                        @m.PlayedAt.ToLocalTime().ToString("MM/dd")<br />
+                        @m.PlayedAt.ToLocalTime().ToString("HH:mm")
+                    </div>
+                    <div style="flex:1">
+                        <div class="match-players">
+                            <span class="match-winner">@winner?.Name</span>
+                            <span class="vs-badge">勝</span>
+                            <span class="match-loser">@loser?.Name</span>
+                        </div>
+                        @if (winnerDeck != null || lostDeck != null)
+                        {
+                            <div style="font-size:11px; color:var(--text-dim); margin-top:4px;">
+                                🃏 @(winnerDeck?.Name ?? "?") → 💀 @(lostDeck?.Name ?? "?")
+                            </div>
+                        }
+                    </div>
+                    @if (lostDeck != null)
+                    {
+                        <div class="deck-lost-badge">💀 @lostDeck.Name</div>
+                    }
+                </div>
+
+                <!-- メモ -->
+                @if (!string.IsNullOrWhiteSpace(m.Memo))
+                {
+                    <div style="background:var(--surface2); border:1px solid var(--border);
+                                border-radius:6px; padding:8px 10px; font-size:12px;
+                                color:var(--text-dim); line-height:1.5; margin-left:50px;">
+                        📝 @m.Memo
+                    </div>
+                }
+            </div>
+        }
+
+        @if (!matches.Any())
+        {
+            <div style="padding:24px; text-align:center; color:var(--text-dim)">
+                まだ試合が登録されていません
+            </div>
+        }
+    </div>
+}
+
+@code {
+    private List<Match> matches = new();
+    private List<Tournament> allTournaments = new();
+    private Tournament? selectedTournament;
+    private int selectedTournamentId = 0;
+    private Dictionary<int, Player> playerMap = new();
+    private Dictionary<int, Deck> deckMap = new();
+    private bool loading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var season = await SeasonService.GetActiveAsync();
+        if (season != null)
+        {
+            allTournaments = await TournamentService.GetBySeasonAsync(season.Id);
+            var players = await PlayerService.GetAllAsync();
+            playerMap = players.ToDictionary(p => p.Id);
+
+            var active = allTournaments.FirstOrDefault(t => t.IsActive) ?? allTournaments.FirstOrDefault();
+            if (active != null)
+                await SelectTournament(active);
+        }
+        loading = false;
+    }
+
+    private async Task SelectTournament(Tournament t)
+    {
+        selectedTournament = t;
+        selectedTournamentId = t.Id;
+        matches = await MatchService.GetTournamentMatchesAsync(t.Id);
+
+        deckMap.Clear();
+        var standings = await PlayerService.GetTournamentStandingsAsync(t.Id);
+        foreach (var sp in standings)
+        {
+            var decks = await DeckService.GetBySeasonPlayerAsync(sp.Id);
+            foreach (var d in decks)
+                deckMap[d.Id] = d;
+        }
+    }
+}

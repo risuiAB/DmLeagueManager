@@ -1,0 +1,329 @@
+@page "/"
+@inject SeasonService SeasonService
+@inject PlayerService PlayerService
+@inject MatchService MatchService
+@inject DeckService DeckService
+
+<PageTitle>順位表 - DM League Manager</PageTitle>
+
+@if (loading)
+{
+    <div class="loading">読み込み中...</div>
+}
+else if (activeSeason == null)
+{
+    <div class="empty-state">
+        <p>アクティブなシーズンがありません</p>
+        <a href="/admin" class="btn-primary">シーズンを作成する</a>
+    </div>
+}
+else
+{
+    @if (recentElimination != null)
+    {
+        <div class="alert-banner">
+            <span class="alert-icon">💀</span>
+            <span><strong>@recentElimination.Player?.Name</strong> が脱落しました！（@recentElimination.Rank 位）</span>
+        </div>
+    }
+
+    <div class="season-summary">
+        <div class="summary-item">
+            <div class="summary-value">@totalMatches</div>
+            <div class="summary-label">総試合数</div>
+        </div>
+        <div class="summary-item">
+            <div class="summary-value">@standings.Count</div>
+            <div class="summary-label">参加者</div>
+        </div>
+        <div class="summary-item">
+            <div class="summary-value">@activeSeason.DeckCount デッキ</div>
+            <div class="summary-label">デッキ数</div>
+        </div>
+    </div>
+
+    <div class="section-title">現在の順位</div>
+    <div class="standings-card">
+        <div class="standings-header">
+            <div class="standings-title">@activeSeason.Name</div>
+            <div class="match-count">@totalMatches 試合消化</div>
+        </div>
+
+        @{ int displayRank = 1; }
+        @foreach (var sp in standings)
+        {
+            string rowClass = displayRank == 1 ? "player-row top1" : sp.IsEliminated ? "player-row eliminated" : "player-row";
+            string rankClass = displayRank switch { 1 => "rank-num gold", 2 => "rank-num silver", 3 => "rank-num bronze", _ => "rank-num" };
+
+            <div class="@rowClass">
+                <div class="@rankClass">@displayRank</div>
+                <div class="player-info">
+                    <div class="player-name">@sp.Player?.Name</div>
+                    <div class="deck-pips">
+                        @for (int i = 0; i < sp.RemainingDecks; i++)
+                        {
+                            <div class="pip"></div>
+                        }
+                        @for (int i = sp.RemainingDecks; i < activeSeason.DeckCount; i++)
+                        {
+                            <div class="pip lost"></div>
+                        }
+                    </div>
+                </div>
+                <div class="player-stats">
+                    残@(sp.RemainingDecks)デッキ<br />
+                    <span class="text-win">@sp.WinCount 勝</span> / <span class="text-lose">@sp.LoseCount 敗</span>
+                </div>
+                <div class="player-points">
+                    @sp.TotalPoints<span class="points-label">pt</span>
+                </div>
+            </div>
+            displayRank++;
+        }
+    </div>
+
+    <div class="section-title">勝ち点内訳</div>
+    <div class="standings-card">
+        <div class="points-header">
+            <div>プレイヤー</div>
+            <div>順位点</div>
+            <div>デッキ差</div>
+            <div>合計</div>
+        </div>
+        @foreach (var sp in standings)
+        {
+            int rankPt = sp.Rank switch { 1 => 4, 2 => 1, _ => 0 };
+            <div class="points-row">
+                <div class="fw-bold">@sp.Player?.Name</div>
+                <div>@rankPt</div>
+                <div class="@(sp.DeckDiff >= 0 ? "text-win" : "text-lose")">
+                    @(sp.DeckDiff >= 0 ? "+" : "")@sp.DeckDiff
+                </div>
+                <div class="fw-bold text-accent">@sp.TotalPoints</div>
+            </div>
+        }
+    </div>
+}
+
+@if (activeSeason != null && activeSeason.IsActive)
+{
+    <button class="fab" @onclick="OpenModal">⚔️ 試合結果を入力</button>
+}
+
+@if (showModal)
+{
+    <div class="modal-overlay" @onclick="CloseModalOutside">
+        <div class="modal" @onclick:stopPropagation>
+            <div class="modal-handle"></div>
+            <div class="modal-title">⚔️ 試合結果の入力</div>
+
+            <!-- 勝者選択 -->
+            <div class="form-label">🏆 勝者</div>
+            <div class="player-buttons" style="margin-bottom:16px">
+                @foreach (var sp in standings.Where(s => !s.IsEliminated))
+                {
+                    <button class="player-select-btn @(selectedWinnerId == sp.PlayerId ? "selected-win" : "")"
+                            @onclick="() => SelectWinner(sp)">
+                        @sp.Player?.Name
+                    </button>
+                }
+            </div>
+            <!-- 勝者デッキ選択 -->
+            @if (selectedWinnerId > 0)
+            {
+                <div class="form-label">🃏 勝者のデッキ</div>
+                
+                <DeckSelector 
+                    SeasonDecks="@winnerSeasonDecks" 
+                    AllDecks="@winnerAllDecks"
+                    SelectedDeckId="@selectedWinnerDeckId"
+                    OnDeckSelected="@SetWinnerDeckId" 
+                    OnNewDeckName="@SetWinnerNewDeckName" />
+            }
+
+            <!-- 敗者選択 -->
+            <div class="form-label" style="margin-top:16px">💀 敗者</div>
+            <div class="player-buttons" style="margin-bottom:16px">
+                @foreach (var sp in standings.Where(s => !s.IsEliminated && s.PlayerId != selectedWinnerId))
+                {
+                    <button class="player-select-btn @(selectedLoserId == sp.PlayerId ? "selected-lose" : "")"
+                            @onclick="() => SelectLoser(sp)">
+                        @sp.Player?.Name
+                    </button>
+                }
+            </div>
+
+            <!-- 敗者デッキ選択 -->
+            @if (selectedLoserId > 0)
+            {
+                <div class="form-label">💀 敗者のデッキ（このデッキが消滅します）</div>
+                <DeckSelector 
+                    SeasonDecks="@loserSeasonDecks" 
+                    AllDecks="@loserAllDecks"
+                    SelectedDeckId="@selectedLostDeckId"
+                    OnDeckSelected="SetLostDeckId" 
+                    OnNewDeckName="SetLoserNewDeckName" />
+            }
+
+            @if (errorMessage != null)
+            {
+                <div class="error-msg">⚠️ @errorMessage</div>
+            }
+
+            <button class="submit-btn" @onclick="SubmitMatch" disabled="@submitting">
+                @(submitting ? "登録中..." : "✅ 結果を確定する")
+            </button>
+        </div>
+    </div>
+}
+
+@code {
+    private Season? activeSeason;
+    private List<SeasonPlayer> standings = new();
+    private int totalMatches = 0;
+    private bool loading = true;
+    private SeasonPlayer? recentElimination;
+
+    // モーダル
+    private bool showModal = false;
+    private int selectedWinnerId = 0;
+    private int selectedWinnerSeasonPlayerId = 0;
+    private int selectedLoserId = 0;
+    private int selectedLoserSeasonPlayerId = 0;
+
+    // 勝者デッキ
+    private int selectedWinnerDeckId = 0;
+    private string winnerNewDeckName = "";
+    private List<Deck> winnerSeasonDecks = new();
+    private List<Deck> winnerAllDecks = new();
+
+    // 敗者デッキ
+    private int selectedLostDeckId = 0;
+    private string loserNewDeckName = "";
+    private List<Deck> loserSeasonDecks = new();
+    private List<Deck> loserAllDecks = new();
+
+    private string? errorMessage;
+    private bool submitting = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        loading = true;
+        activeSeason = await SeasonService.GetActiveAsync();
+        if (activeSeason != null)
+        {
+            standings = await PlayerService.GetSeasonStandingsAsync(activeSeason.Id);
+            var matches = await MatchService.GetSeasonMatchesAsync(activeSeason.Id);
+            totalMatches = matches.Count;
+            recentElimination = standings.Where(sp => sp.IsEliminated)
+                .OrderByDescending(sp => sp.Rank).FirstOrDefault();
+        }
+        loading = false;
+    }
+
+    private void OpenModal()
+    {
+        showModal = true;
+        selectedWinnerId = 0;
+        selectedWinnerSeasonPlayerId = 0;
+        selectedLoserId = 0;
+        selectedLoserSeasonPlayerId = 0;
+        selectedWinnerDeckId = 0;
+        selectedLostDeckId = 0;
+        winnerNewDeckName = "";
+        loserNewDeckName = "";
+        winnerSeasonDecks.Clear();
+        winnerAllDecks.Clear();
+        loserSeasonDecks.Clear();
+        loserAllDecks.Clear();
+        errorMessage = null;
+    }
+
+    private void CloseModalOutside() => showModal = false;
+
+    private async Task SelectWinner(SeasonPlayer sp)
+    {
+        selectedWinnerId = sp.PlayerId;
+        selectedWinnerSeasonPlayerId = sp.Id;
+        selectedWinnerDeckId = 0;
+        winnerNewDeckName = "";
+        winnerSeasonDecks = await DeckService.GetBySeasonPlayerAsync(sp.Id);
+        winnerAllDecks = await DeckService.GetAllByPlayerAsync(sp.PlayerId);
+    }
+
+    private async Task SelectLoser(SeasonPlayer sp)
+    {
+        selectedLoserId = sp.PlayerId;
+        selectedLoserSeasonPlayerId = sp.Id;
+        selectedLostDeckId = 0;
+        loserNewDeckName = "";
+        loserSeasonDecks = await DeckService.GetBySeasonPlayerAsync(sp.Id);
+        loserAllDecks = await DeckService.GetAllByPlayerAsync(sp.PlayerId);
+    }
+
+    private async Task SubmitMatch()
+    {
+        errorMessage = null;
+
+        if (selectedWinnerId == 0) { errorMessage = "勝者を選択してください"; return; }
+        if (selectedWinnerDeckId == 0 && string.IsNullOrWhiteSpace(winnerNewDeckName))
+        {
+            errorMessage = "勝者のデッキを選択または入力してください"; return;
+        }
+        if (selectedLoserId == 0) { errorMessage = "敗者を選択してください"; return; }
+        if (selectedLostDeckId == 0 && string.IsNullOrWhiteSpace(loserNewDeckName))
+        {
+            errorMessage = "敗者のデッキを選択または入力してください"; return;
+        }
+
+        submitting = true;
+        try
+        {
+            // 新規デッキの場合は登録してIDを取得
+            int winnerDeckId = selectedWinnerDeckId;
+            if (winnerDeckId == 0)
+            {
+                var deck = await DeckService.RegisterDeckAsync(
+                    selectedWinnerSeasonPlayerId, selectedWinnerId, winnerNewDeckName);
+                winnerDeckId = deck.Id;
+            }
+
+            int lostDeckId = selectedLostDeckId;
+            if (lostDeckId == 0)
+            {
+                var deck = await DeckService.RegisterDeckAsync(
+                    selectedLoserSeasonPlayerId, selectedLoserId, loserNewDeckName);
+                lostDeckId = deck.Id;
+            }
+
+            await MatchService.RecordMatchAsync(
+                activeSeason!.Id,
+                selectedWinnerId,
+                selectedLoserId,
+                winnerDeckId,
+                lostDeckId
+            );
+
+            showModal = false;
+            await LoadData();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"エラー: {ex.Message}";
+        }
+        finally
+        {
+            submitting = false;
+        }
+    }
+
+    private void SetWinnerDeckId(int id) => selectedWinnerDeckId = id;
+    private void SetWinnerNewDeckName(string name) => winnerNewDeckName = name;
+    private void SetLostDeckId(int id) => selectedLostDeckId = id;
+    private void SetLoserNewDeckName(string name) => loserNewDeckName = name;
+}

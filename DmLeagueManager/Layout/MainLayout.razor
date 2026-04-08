@@ -1,0 +1,35 @@
+@inherits LayoutComponentBase
+
+<div class="app-wrapper">
+    <header class="app-header">
+        <div class="header-logo">
+            <div class="logo-icon">DM</div>
+            <div class="logo-text">League Manager</div>
+        </div>
+        <div class="season-badge">
+            シーズン <span>@CurrentSeasonName</span>
+        </div>
+    </header>
+
+    <nav class="app-nav">
+        <NavLink class="nav-item" href="/" Match="NavLinkMatch.All">🏆 順位表</NavLink>
+        <NavLink class="nav-item" href="/matches">⚔️ 試合ログ</NavLink>
+        <NavLink class="nav-item" href="/decks">🃏 デッキ</NavLink>
+        <NavLink class="nav-item" href="/history">📊 シーズン履歴</NavLink>
+        <NavLink class="nav-item" href="/admin">⚙️ 管理</NavLink>
+    </nav>
+
+    <main class="app-main">
+        @Body
+    </main>
+</div>
+
+@code {
+    private string CurrentSeasonName = "...";
+
+    protected override async Task OnInitializedAsync()
+    {
+        // TODO: SeasonServiceから現在シーズン名を取得
+        CurrentSeasonName = CurrentSeasonName != null ? CurrentSeasonName : "";
+    }
+}

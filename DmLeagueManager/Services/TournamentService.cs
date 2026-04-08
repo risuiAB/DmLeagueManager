@@ -1,0 +1,129 @@
+using DmLeagueManager.Models;
+using Supabase;
+
+namespace DmLeagueManager.Services;
+
+public class TournamentService(Client supabase, AppConfig config)
+{
+    public async Task<List<Tournament>> GetBySeasonAsync(int seasonId)
+    {
+        if (config.UseMock)
+        {
+            await Task.Delay(150);
+            return MockData.Tournaments.Where(t => t.SeasonId == seasonId)
+                .OrderByDescending(t => t.CreatedAt).ToList();
+        }
+
+        var result = await supabase.From<Tournament>()
+            .Where(t => t.SeasonId == seasonId)
+            .Order("created_at", Supabase.Postgrest.Constants.Ordering.Descending)
+            .Get();
+        return result.Models;
+    }
+
+    public async Task<Tournament?> GetActiveTournamentAsync(int seasonId)
+    {
+        if (config.UseMock)
+        {
+            await Task.Delay(100);
+            return MockData.Tournaments
+                .FirstOrDefault(t => t.SeasonId == seasonId && t.Status == "active");
+        }
+
+        var result = await supabase.From<Tournament>()
+            .Where(t => t.SeasonId == seasonId && t.Status == "active")
+            .Single();
+        return result;
+    }
+
+    public async Task<Tournament> CreateAsync(int seasonId, string name, int deckCount)
+    {
+        if (config.UseMock)
+        {
+            await Task.Delay(300);
+
+            // モック: 前の大会の全デッキをactiveに戻す
+            var prevSpIds = MockData.SeasonPlayers
+                .Where(sp => sp.SeasonId == seasonId)
+                .Select(sp => sp.Id)
+                .ToHashSet();
+            foreach (var deck in MockData.Decks.Where(d => prevSpIds.Contains(d.SeasonPlayerId)))
+                deck.Status = "active";
+
+            var t = new Tournament
+            {
+                Id = MockData.Tournaments.Any() ? MockData.Tournaments.Max(x => x.Id) + 1 : 1,
+                SeasonId = seasonId,
+                Name = name,
+                DeckCount = deckCount,
+                Status = "active",
+                CreatedAt = DateTime.Now
+            };
+            MockData.Tournaments.Add(t);
+            return t;
+        }
+
+        // RPC で1回のAPIコールで全デッキをactiveに戻す
+        await supabase.Rpc("reset_decks_for_season", new { p_season_id = seasonId });
+
+        var tournament = new Tournament
+        {
+            SeasonId = seasonId,
+            Name = name,
+            DeckCount = deckCount,
+            Status = "active"
+        };
+        var result = await supabase.From<Tournament>().Insert(tournament);
+        return result.Model!;
+    }
+
+    public async Task FinishAsync(int tournamentId, List<SeasonPlayer> standings)
+    {
+        if (config.UseMock)
+        {
+            await Task.Delay(300);
+            var t = MockData.Tournaments.FirstOrDefault(x => x.Id == tournamentId);
+            if (t != null) t.Status = "finished";
+
+            // 順位未確定のプレイヤーに順位を付与
+            var unranked = standings
+                .Where(sp => sp.Rank == null)
+                .OrderByDescending(sp => sp.RemainingDecks)
+                .ThenByDescending(sp => sp.WinCount)
+                .ToList();
+
+            int rank = standings.Count(sp => sp.Rank != null) + 1;
+            foreach (var sp in unranked)
+            {
+                sp.Rank = rank++;
+                int rankPoints = sp.Rank switch { 1 => 3, 2 => 1, _ => 0 };
+                sp.TotalPoints = rankPoints + sp.DeckDiff;
+            }
+            return;
+        }
+
+        // 順位未確定のプレイヤーに順位を付与
+        var unrankedReal = standings
+            .Where(sp => sp.Rank == null)
+            .OrderByDescending(sp => sp.RemainingDecks)
+            .ThenByDescending(sp => sp.WinCount)
+            .ToList();
+
+        int currentRank = standings.Count(sp => sp.Rank != null) + 1;
+        foreach (var sp in unrankedReal)
+        {
+            sp.Rank = currentRank++;
+            int rankPoints = sp.Rank switch { 1 => 3, 2 => 1, _ => 0 };
+            sp.TotalPoints = rankPoints + sp.DeckDiff;
+            await supabase.From<SeasonPlayer>().Update(sp);
+        }
+
+        var tournament = await supabase.From<Tournament>()
+            .Where(t => t.Id == tournamentId).Single();
+        if (tournament != null)
+        {
+            tournament.Status = "finished";
+            await supabase.From<Tournament>().Update(tournament);
+        }
+    }
+}

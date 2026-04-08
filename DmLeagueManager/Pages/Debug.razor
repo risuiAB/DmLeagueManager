@@ -1,0 +1,149 @@
+@page "/debug"
+@inject SeasonService SeasonService
+@inject PlayerService PlayerService
+@inject DeckService DeckService
+@inject TournamentService TournamentService
+@inject DmLeagueManager.Services.AppConfig Config
+
+<PageTitle>接続確認 - DM League Manager</PageTitle>
+
+<div style="padding:16px; font-family:monospace;">
+
+    <h2 style="color:var(--accent); margin-bottom:16px;">🔧 接続確認</h2>
+
+    <!-- モード表示 -->
+    <div style="background:var(--surface2); border:1px solid var(--border); border-radius:8px; padding:12px; margin-bottom:16px;">
+        <strong>現在のモード：</strong>
+        @if (Config.UseMock)
+        {
+            <span style="color:#f1c40f;">⚠️ モック（ダミーデータ）</span>
+        }
+        else
+        {
+            <span style="color:var(--win);">✅ Supabase本番接続</span>
+        }
+    </div>
+
+    <!-- テスト実行ボタン -->
+    <button class="btn-primary" @onclick="RunTests" disabled="@running">
+        @(running ? "テスト中..." : "▶ 接続テスト実行")
+    </button>
+
+    <!-- 結果一覧 -->
+    @if (results.Any())
+    {
+        <div style="margin-top:16px; display:flex; flex-direction:column; gap:8px;">
+            @foreach (var r in results)
+            {
+                <div style="background:var(--surface); border:1px solid @(r.Ok ? "rgba(39,174,96,0.4)" : "rgba(192,57,43,0.4)");
+                            border-radius:8px; padding:12px;">
+                    <div>
+                        @(r.Ok ? "✅" : "❌") <strong>@r.Label</strong>
+                    </div>
+                    <div style="color:var(--text-dim); font-size:12px; margin-top:4px;">
+                        @r.Message
+                    </div>
+                </div>
+            }
+        </div>
+
+    }
+
+</div>
+
+@code {
+    private bool running = false;
+    private List<TestResult> results = new();
+
+    private async Task RunTests()
+    {
+        running = true;
+        results.Clear();
+
+        // テスト1: シーズン取得
+        await Test("シーズン取得", async () =>
+        {
+            var seasons = await SeasonService.GetAllAsync();
+            return $"{seasons.Count} 件取得";
+        });
+
+        // テスト2: アクティブシーズン
+        await Test("アクティブシーズン取得", async () =>
+        {
+            var s = await SeasonService.GetActiveAsync();
+            return s != null ? $"「{s.Name}」を取得" : "アクティブシーズンなし（正常）";
+        });
+
+        // テスト3: プレイヤー取得
+        await Test("プレイヤー取得", async () =>
+        {
+            var players = await PlayerService.GetAllAsync();
+            var names = string.Join(", ", players.Select(p => p.Name));
+            return $"{players.Count} 件: {names}";
+        });
+
+        // テスト4: 順位表取得
+        await Test("順位表取得", async () =>
+        {
+            var s = await SeasonService.GetActiveAsync();
+            if (s == null) return "アクティブシーズンなし（スキップ）";
+
+            var tournaments = await TournamentService.GetBySeasonAsync(s.Id);
+            var activeTournament = tournaments.FirstOrDefault(t => t.IsActive);
+            if (activeTournament == null) return "進行中の大会なし（スキップ）";
+
+            var standings = await PlayerService.GetTournamentStandingsAsync(activeTournament.Id);
+            return $"{standings.Count} 人分取得";
+        });
+        await Test("プレイヤー重複チェック", async () =>
+        {
+            var players = await PlayerService.GetAllAsync();
+            var duplicates = players.GroupBy(p => p.Id).Where(g => g.Count() > 1).ToList();
+            if (duplicates.Any())
+                return $"重複あり: ID {string.Join(", ", duplicates.Select(g => g.Key))}";
+            return $"重複なし（{players.Count}件）";
+        });
+        await Test("デッキ重複チェック", async () =>
+        {
+            var season = await SeasonService.GetActiveAsync();
+            if (season == null) return "シーズンなし";
+            var tournaments = await TournamentService.GetBySeasonAsync(season.Id);
+            var allDecks = new List<Deck>();
+            foreach (var t in tournaments)
+            {
+                var standings = await PlayerService.GetTournamentStandingsAsync(t.Id);
+                foreach (var sp in standings)
+                {
+                    var decks = await DeckService.GetBySeasonPlayerAsync(sp.Id);
+                    allDecks.AddRange(decks);
+                }
+            }
+            var duplicates = allDecks.GroupBy(d => d.Id).Where(g => g.Count() > 1).ToList();
+            if (duplicates.Any())
+                return $"重複あり: ID {string.Join(", ", duplicates.Select(g => g.Key))}";
+            return $"重複なし（{allDecks.Count}件）";
+        });
+        running = false;
+    }
+
+    private async Task Test(string label, Func<Task<string>> action)
+    {
+        try
+        {
+            var msg = await action();
+            results.Add(new TestResult { Label = label, Message = msg, Ok = true });
+        }
+        catch (Exception ex)
+        {
+            results.Add(new TestResult { Label = label, Message = ex.Message, Ok = false });
+        }
+        StateHasChanged();
+    }
+
+    private class TestResult
+    {
+        public string Label { get; set; } = "";
+        public string Message { get; set; } = "";
+        public bool Ok { get; set; }
+    }
+}

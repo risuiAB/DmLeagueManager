@@ -1,0 +1,88 @@
+using DmLeagueManager.Models;
+using Supabase;
+
+namespace DmLeagueManager.Services;
+
+public class SeasonService(Client supabase, AppConfig config)
+{
+    public async Task<List<Season>> GetAllAsync()
+    {
+        if (config.UseMock)
+        {
+            await Task.Delay(200);
+            return MockData.Seasons.OrderByDescending(s => s.CreatedAt).ToList();
+        }
+
+        var result = await supabase
+            .From<Season>()
+            .Order("created_at", Supabase.Postgrest.Constants.Ordering.Descending)
+            .Get();
+        return result.Models;
+    }
+
+    public async Task<Season?> GetActiveAsync()
+    {
+        if (config.UseMock)
+        {
+            await Task.Delay(200);
+            return MockData.Seasons.FirstOrDefault(s => s.Status == "active");
+        }
+
+        var result = await supabase
+            .From<Season>()
+            .Where(s => s.Status == "active")
+            .Single();
+        return result;
+    }
+
+    public async Task<Season> CreateAsync(string name, int deckCount = 6)
+    {
+        if (config.UseMock)
+        {
+            await Task.Delay(300);
+            var newSeason = new Season
+            {
+                Id = MockData.Seasons.Max(s => s.Id) + 1,
+                Name = name,
+                Status = "active",
+                DeckCount = deckCount,
+                CreatedAt = DateTime.Now
+            };
+            MockData.Seasons.Add(newSeason);
+            return newSeason;
+        }
+
+        var season = new Season { Name = name, Status = "active", DeckCount = deckCount };
+        var result = await supabase.From<Season>().Insert(season);
+        return result.Model!;
+    }
+
+    public async Task FinishAsync(int seasonId, List<SeasonPlayer> finalStandings)
+    {
+        if (config.UseMock)
+        {
+            await Task.Delay(300);
+            var season = MockData.Seasons.FirstOrDefault(s => s.Id == seasonId);
+            if (season != null) season.Status = "finished";
+            return;
+        }
+
+        var ordered = finalStandings
+            .Where(sp => sp.Rank == null)
+            .OrderByDescending(sp => sp.RemainingDecks)
+            .ThenByDescending(sp => sp.WinCount)
+            .ToList();
+
+        int currentRank = 1;
+        foreach (var sp in ordered)
+        {
+            sp.Rank = currentRank++;
+            int rankPoints = sp.Rank switch { 1 => 4, 2 => 1, _ => 0 };
+            sp.TotalPoints += rankPoints + sp.DeckDiff;
+            await supabase.From<SeasonPlayer>().Update(sp);
+        }
+
+        var s2 = await supabase.From<Season>().Where(s => s.Id == seasonId).Single();
+        if (s2 != null) { s2.Status = "finished"; await supabase.From<Season>().Update(s2); }
+    }
+}

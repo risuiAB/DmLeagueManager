@@ -1,0 +1,196 @@
+@page "/matches"
+@using DmLeagueManager.Models
+@using DmLeagueManager.Services
+@inject SeasonService SeasonService
+@inject TournamentService TournamentService
+@inject MatchService MatchService
+@inject PlayerService PlayerService
+@inject DeckService DeckService
+
+<PageTitle>試合ログ - DM League Manager</PageTitle>
+
+<div class="section-title">試合ログ</div>
+
+@if (loading)
+{
+    <div class="loading">読み込み中...</div>
+}
+else
+{
+    <!-- 大会切り替え -->
+    @if (allTournaments.Any())
+    {
+        <div class="player-tabs" style="margin-bottom:16px">
+            @foreach (var t in allTournaments)
+            {
+                <button class="player-tab-btn @(selectedTournamentId == t.Id ? "active" : "")"
+                        @onclick="() => SelectTournament(t)">
+                    @t.Name @(t.IsActive ? "🔴" : "")
+                </button>
+            }
+        </div>
+    }
+
+    <!-- 先攻勝率サマリー -->
+    @if (firstPlayerStats.TotalGames > 0)
+    {
+        <div class="standings-card" style="margin-bottom:16px;">
+            <div class="standings-header">
+                <div class="standings-title">⚡ 先攻勝率</div>
+                <div class="match-count">@firstPlayerStats.TotalGames 試合集計</div>
+            </div>
+
+            <!-- 全体 -->
+            <div style="padding:12px 16px; border-bottom:1px solid var(--border);">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                    <span style="font-size:13px; font-weight:700;">全体</span>
+                    <span style="font-size:20px; font-weight:900; color:@(firstPlayerStats.FirstPlayerWinRate >= 50 ? "var(--win)" : "var(--lose)")">
+                        @firstPlayerStats.FirstPlayerWinRate%
+                    </span>
+                </div>
+                <div style="background:var(--surface2); border-radius:4px; height:8px; overflow:hidden;">
+                    <div style="width:@(firstPlayerStats.FirstPlayerWinRate)%; background:@(firstPlayerStats.FirstPlayerWinRate >= 50 ? "var(--win)" : "var(--lose)"); height:100%;"></div>
+                </div>
+                <div style="font-size:11px; color:var(--text-dim); margin-top:4px;">
+                    先攻 @firstPlayerStats.FirstPlayerWins 勝 / @(firstPlayerStats.TotalGames - firstPlayerStats.FirstPlayerWins) 敗
+                </div>
+            </div>
+
+            <!-- プレイヤー別 -->
+            @foreach (var p in playerMap.Values)
+            {
+                var pStats = MatchService.CalcFirstPlayerStats(matches, p.Id);
+                @if (pStats.TotalGames > 0)
+                {
+                    <div style="padding:10px 16px; border-bottom:1px solid var(--border);">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                            <span style="font-size:12px; color:var(--text-dim);">@p.Name</span>
+                            <span style="font-size:15px; font-weight:900; color:@(pStats.FirstPlayerWinRate >= 50 ? "var(--win)" : "var(--lose)")">
+                                @pStats.FirstPlayerWinRate%
+                            </span>
+                        </div>
+                        <div style="background:var(--surface2); border-radius:4px; height:5px; overflow:hidden;">
+                            <div style="width:@(pStats.FirstPlayerWinRate)%; background:@(pStats.FirstPlayerWinRate >= 50 ? "var(--win)" : "var(--lose)"); height:100%;"></div>
+                        </div>
+                        <div style="font-size:10px; color:var(--text-dim); margin-top:2px;">
+                            @pStats.FirstPlayerWins 勝 / @(pStats.TotalGames - pStats.FirstPlayerWins) 敗（@pStats.TotalGames 試合）
+                        </div>
+                    </div>
+                }
+            }
+        </div>
+    }
+
+    <!-- 試合ログ -->
+    <div class="match-log">
+        <div class="match-log-header">
+            <span class="fw-bold">@(selectedTournament?.Name ?? "試合記録")</span>
+            <span class="text-dim">@matches.Count 試合</span>
+        </div>
+
+        @foreach (var m in matches)
+        {
+            var winner = playerMap.GetValueOrDefault(m.WinnerPlayerId);
+            var loser = playerMap.GetValueOrDefault(m.LoserPlayerId);
+            var winnerDeck = deckMap.GetValueOrDefault(m.WinnerDeckId);
+            var lostDeck = deckMap.GetValueOrDefault(m.LostDeckId);
+            var firstPlayer = m.FirstPlayerId.HasValue ? playerMap.GetValueOrDefault(m.FirstPlayerId.Value) : null;
+
+            <div class="match-item" style="flex-direction:column; align-items:stretch; gap:6px;">
+                <!-- 試合情報行 -->
+                <div style="display:flex; align-items:center; gap:10px;">
+                    <div class="match-time">
+                        @m.PlayedAt.ToLocalTime().ToString("MM/dd")<br />
+                        @m.PlayedAt.ToLocalTime().ToString("HH:mm")
+                    </div>
+                    <div style="flex:1">
+                        <div class="match-players">
+                            <span class="match-winner">@winner?.Name</span>
+                            <span class="vs-badge">勝</span>
+                            <span class="match-loser">@loser?.Name</span>
+                        </div>
+                        <div style="font-size:11px; color:var(--text-dim); margin-top:3px; display:flex; gap:8px; flex-wrap:wrap;">
+                            @if (winnerDeck != null || lostDeck != null)
+                            {
+                                <span>🃏 @(winnerDeck?.Name ?? "?") → 💀 @(lostDeck?.Name ?? "?")</span>
+                            }
+                            @if (firstPlayer != null)
+                            {
+                                <span style="color:@(m.FirstPlayerWon == true ? "var(--win)" : "var(--lose)")">
+                                    ⚡ 先攻: @firstPlayer.Name @(m.FirstPlayerWon == true ? "（勝）" : "（負）")
+                                </span>
+                            }
+                        </div>
+                    </div>
+                    @if (lostDeck != null)
+                    {
+                        <div class="deck-lost-badge">💀 @lostDeck.Name</div>
+                    }
+                </div>
+
+                <!-- メモ -->
+                @if (!string.IsNullOrWhiteSpace(m.Memo))
+                {
+                    <div style="background:var(--surface2); border:1px solid var(--border);
+                                border-radius:6px; padding:8px 10px; font-size:12px;
+                                color:var(--text-dim); line-height:1.5; margin-left:50px;">
+                        📝 @m.Memo
+                    </div>
+                }
+            </div>
+        }
+
+        @if (!matches.Any())
+        {
+            <div style="padding:24px; text-align:center; color:var(--text-dim)">
+                まだ試合が登録されていません
+            </div>
+        }
+    </div>
+}
+
+@code {
+    private List<Match> matches = new();
+    private List<Tournament> allTournaments = new();
+    private Tournament? selectedTournament;
+    private int selectedTournamentId = 0;
+    private Dictionary<int, Player> playerMap = new();
+    private Dictionary<int, Deck> deckMap = new();
+    private FirstPlayerStats firstPlayerStats = new();
+    private bool loading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var season = await SeasonService.GetActiveAsync();
+        if (season != null)
+        {
+            allTournaments = await TournamentService.GetBySeasonAsync(season.Id);
+            var players = await PlayerService.GetAllAsync();
+            playerMap = players.ToDictionary(p => p.Id);
+
+            var active = allTournaments.FirstOrDefault(t => t.IsActive) ?? allTournaments.FirstOrDefault();
+            if (active != null)
+                await SelectTournament(active);
+        }
+        loading = false;
+    }
+
+    private async Task SelectTournament(Tournament t)
+    {
+        selectedTournament = t;
+        selectedTournamentId = t.Id;
+        matches = await MatchService.GetTournamentMatchesAsync(t.Id);
+
+        deckMap.Clear();
+        var standings = await PlayerService.GetTournamentStandingsAsync(t.Id);
+        foreach (var sp in standings)
+        {
+            var decks = await DeckService.GetBySeasonPlayerAsync(sp.Id);
+            foreach (var d in decks)
+                deckMap[d.Id] = d;
+        }
+
+        // 先攻勝率計算
+        firstPlayerStats = MatchService.CalcFirstPlayerStats(matches);
+    }
+}

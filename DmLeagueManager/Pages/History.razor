@@ -1,0 +1,104 @@
+@page "/history"
+@using DmLeagueManager.Models
+@using DmLeagueManager.Services
+@inject SeasonService SeasonService
+@inject TournamentService TournamentService
+@inject PlayerService PlayerService
+
+<PageTitle>シーズン履歴 - DM League Manager</PageTitle>
+
+<div class="section-title">シーズン履歴</div>
+
+@if (loading)
+{
+    <div class="loading">読み込み中...</div>
+}
+else if (!finishedSeasons.Any())
+{
+    <div class="empty-state">過去のシーズンはありません</div>
+}
+else
+{
+    @foreach (var season in finishedSeasons)
+    {
+        <!-- シーズン総合順位 -->
+        <div class="standings-card" style="margin-bottom:8px">
+            <div class="standings-header">
+                <div class="standings-title">@season.Name</div>
+                <div class="match-count">終了済み</div>
+            </div>
+            @{ int rank = 1; }
+            @foreach (var r in seasonRankingsMap.GetValueOrDefault(season.Id, new()))
+            {
+                string rankClass = rank switch { 1 => "rank-num gold", 2 => "rank-num silver", _ => "rank-num eliminated-rank" };
+                <div class="player-row">
+                    <div class="@rankClass">@rank</div>
+                    <div class="player-info">
+                        <div class="player-name">@r.Player.Name</div>
+                        <div style="font-size:11px; color:var(--text-dim)">@r.TournamentCount 大会参加</div>
+                    </div>
+                    <div class="player-stats">
+                        <span class="text-win">@r.TotalWins 勝</span> / <span class="text-lose">@r.TotalLoses 敗</span>
+                    </div>
+                    <div class="player-points">@r.TotalPoints<span class="points-label">pt</span></div>
+                </div>
+                rank++;
+            }
+        </div>
+
+        <!-- 大会別結果 -->
+        @foreach (var t in tournamentMap.GetValueOrDefault(season.Id, new()))
+        {
+            <div class="standings-card" style="margin-bottom:16px; margin-left:12px; border-left:3px solid var(--border);">
+                <div class="standings-header">
+                    <div style="font-size:13px; color:var(--text-dim)">└ @t.Name</div>
+                    <div class="match-count">@t.DeckCount デッキ</div>
+                </div>
+                @{ int tRank = 1; }
+                @foreach (var sp in tournamentStandingsMap.GetValueOrDefault(t.Id, new()))
+                {
+                    string tRankClass = tRank switch { 1 => "rank-num gold", 2 => "rank-num silver", _ => "rank-num eliminated-rank" };
+                    <div class="player-row">
+                        <div class="@tRankClass">@tRank</div>
+                        <div class="player-info">
+                            <div class="player-name">@sp.Player?.Name</div>
+                        </div>
+                        <div class="player-stats">
+                            <span class="text-win">@sp.WinCount 勝</span> / <span class="text-lose">@sp.LoseCount 敗</span>
+                        </div>
+                        <div class="player-points">@sp.TotalPoints<span class="points-label">pt</span></div>
+                    </div>
+                    tRank++;
+                }
+            </div>
+        }
+    }
+}
+
+@code {
+    private List<Season> finishedSeasons = new();
+    private Dictionary<int, List<SeasonRanking>> seasonRankingsMap = new();
+    private Dictionary<int, List<Tournament>> tournamentMap = new();
+    private Dictionary<int, List<SeasonPlayer>> tournamentStandingsMap = new();
+    private bool loading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var allSeasons = await SeasonService.GetAllAsync();
+        finishedSeasons = allSeasons.Where(s => s.Status == "finished").ToList();
+
+        foreach (var season in finishedSeasons)
+        {
+            seasonRankingsMap[season.Id] = await PlayerService.GetSeasonRankingsAsync(season.Id);
+
+            var tournaments = await TournamentService.GetBySeasonAsync(season.Id);
+            tournamentMap[season.Id] = tournaments;
+
+            foreach (var t in tournaments)
+            {
+                tournamentStandingsMap[t.Id] = await PlayerService.GetTournamentStandingsAsync(t.Id);
+            }
+        }
+        loading = false;
+    }
+}
