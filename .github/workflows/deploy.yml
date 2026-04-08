@@ -40,27 +40,29 @@ jobs:
         run: |
           REPO_NAME=$(echo "${{ github.repository }}" | cut -d'/' -f2)
           sed -i "s|<base href=\"/\" />|<base href=\"/$REPO_NAME/\" />|g" release/wwwroot/index.html
-      - name: Fix index.html for SPA routing
-        run: |
-          sed -i 's|</head>|<script>var r=window.location.hash;if(r.startsWith("#/")){history.replaceState(null,"",window.location.pathname.replace(/\/$/,"")+r.slice(1));}</script></head>|' release/wwwroot/index.html
-      - name: Add .nojekyll
-        run: touch release/wwwroot/.nojekyll
+      
       - name: Add 404.html for SPA routing
         run: |
-          cat > release/wwwroot/404.html << 'EOF'
+          REPO_NAME=$(echo "${{ github.repository }}" | cut -d'/' -f2)
+          cat > release/wwwroot/404.html << HTMLEOF
           <!DOCTYPE html>
           <html>
           <head>
             <meta charset="utf-8">
+            <title>DM League Manager</title>
             <script>
-              var repo = '/DmLeagueManager';
-              var path = window.location.pathname.replace(repo, '');
-              window.location.replace(repo + '/#' + path);
+              sessionStorage.redirect = location.href;
             </script>
+            <meta http-equiv="refresh" content="0;URL='/$REPO_NAME/'">
           </head>
           <body></body>
           </html>
-          EOF
+          HTMLEOF
+      
+      - name: Fix index.html redirect
+        run: |
+          REPO_NAME=$(echo "${{ github.repository }}" | cut -d'/' -f2)
+          sed -i "s|</title>|</title><script>var r=sessionStorage.redirect;delete sessionStorage.redirect;if(r&&r!==location.href){history.replaceState(null,null,r);}</script>|" release/wwwroot/index.html
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
         with:
