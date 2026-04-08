@@ -20,8 +20,8 @@ jobs:
           find . -name "*.csproj"
       - name: Write Supabase config
         run: |
-          mkdir -p DmLeagueManager/DmLeagueManager/DmLeagueManager/wwwroot
-          cat > DmLeagueManager/DmLeagueManager/DmLeagueManager/wwwroot/appsettings.json << EOF
+          mkdir -p DmLeagueManager/wwwroot
+          cat > DmLeagueManager/wwwroot/appsettings.json << EOF
           {
             "Supabase": {
               "Url": "${{ secrets.SUPABASE_URL }}",
@@ -32,7 +32,7 @@ jobs:
       
       - name: Publish
         run: |
-          dotnet publish DmLeagueManager/DmLeagueManager/DmLeagueManager/DmLeagueManager.csproj \
+          dotnet publish DmLeagueManager/DmLeagueManager.csproj \
             -c Release \
             -o release \
             --nologo
