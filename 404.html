@@ -2,11 +2,11 @@
 <html>
 <head>
   <meta charset="utf-8">
+  <title>DM League Manager</title>
   <script>
-    var repo = '/DmLeagueManager';
-    var path = window.location.pathname.replace(repo, '');
-    window.location.replace(repo + '/#' + path);
+    sessionStorage.redirect = location.href;
   </script>
+  <meta http-equiv="refresh" content="0;URL='/DmLeagueManager/'">
 </head>
 <body></body>
 </html>
