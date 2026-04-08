@@ -1,28 +1,23 @@
 name: Deploy to GitHub Pages
-
 on:
   push:
     branches: [master]
   workflow_dispatch:
-
 permissions:
   contents: write
-
 jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '9.0.x'
-
       - name: Write Supabase config
         run: |
-          cat > src/DmLeagueManager/wwwroot/appsettings.json << EOF
+          cat > DmLeagueManager/DmLeagueManager/wwwroot/appsettings.json << EOF
           {
             "Supabase": {
               "Url": "${{ secrets.SUPABASE_URL }}",
@@ -30,22 +25,18 @@ jobs:
             }
           }
           EOF
-
       - name: Publish
         run: |
-          dotnet publish src/DmLeagueManager/DmLeagueManager.csproj \
+          dotnet publish DmLeagueManager/DmLeagueManager/DmLeagueManager.csproj \
             -c Release \
             -o release \
             --nologo
-
       - name: Fix base href for GitHub Pages
         run: |
           REPO_NAME=$(echo "${{ github.repository }}" | cut -d'/' -f2)
           sed -i "s|<base href=\"/\" />|<base href=\"/$REPO_NAME/\" />|g" release/wwwroot/index.html
-
       - name: Add .nojekyll
         run: touch release/wwwroot/.nojekyll
-
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
         with:
