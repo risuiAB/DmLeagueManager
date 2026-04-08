@@ -17,8 +17,8 @@ jobs:
           dotnet-version: '9.0.x'
       - name: Write Supabase config
         run: |
-          mkdir -p DmLeagueManager/DmLeagueManager/wwwroot
-          cat > DmLeagueManager/DmLeagueManager/wwwroot/appsettings.json << EOF
+          mkdir -p DMLeagueManager/DMLeagueManager/wwwroot
+          cat > DMLeagueManager/DMLeagueManager/wwwroot/appsettings.json << EOF
           {
             "Supabase": {
               "Url": "${{ secrets.SUPABASE_URL }}",
@@ -26,9 +26,10 @@ jobs:
             }
           }
           EOF
+      
       - name: Publish
         run: |
-          dotnet publish DmLeagueManager/DmLeagueManager/DmLeagueManager.csproj \
+          dotnet publish DMLeagueManager/DMLeagueManager/DMLeagueManager.csproj \
             -c Release \
             -o release \
             --nologo
