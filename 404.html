@@ -1,18 +1,33 @@
 <!DOCTYPE html>
-<html>
+<html lang="ja">
 <head>
-  <meta charset="utf-8">
-  <script>
-    var pathSegmentsToKeep = 1;
-    var l = window.location;
-    l.replace(
-      l.protocol + '//' + l.hostname + (l.port ? ':' + l.port : '') +
-      l.pathname.split('/').slice(0, 1 + pathSegmentsToKeep).join('/') + '/?/' +
-      l.pathname.slice(1).split('/').slice(pathSegmentsToKeep).join('/').replace(/&/g, '~and~') +
-      (l.search ? '&' + l.search.slice(1).replace(/&/g, '~and~') : '') +
-      l.hash
-    );
-  </script>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>DM League Manager</title>
+    <base href="/DmLeagueManager/" />
+    <!-- GitHub Pages SPA routing -->
+    <script>
+        (function(l) {
+            if (l.search[1] === '/' ) {
+                var decoded = l.search.slice(1).split('&').map(function(s) { 
+                    return s.replace(/~and~/g, '&')
+                }).join('?');
+                window.history.replaceState(null, null,
+                    l.pathname.slice(0, -1) + decoded + l.hash
+                );
+            }
+        }(window.location))
+    </script>
+    <link href="https://fonts.googleapis.com/css2?family=Zen+Antique+Soft&family=M+PLUS+1p:wght@400;700;900&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="css/app.css" />
 </head>
-<body></body>
+<body>
+    <div id="app">
+        <div style="display:flex; align-items:center; justify-content:center; height:100vh; background:#0a0c14; color:#e8a020; font-family:sans-serif;">
+            読み込み中...
+        </div>
+    </div>
+
+    <script src="_framework/blazor.webassembly.js"></script>
+</body>
 </html>
