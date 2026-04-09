@@ -99,10 +99,20 @@ else
             <div class="match-item" style="flex-direction:column; align-items:stretch; gap:6px;">
                 <!-- 試合情報行 -->
                 <div style="display:flex; align-items:center; gap:10px;">
-                    <div class="match-time">
-                        @m.PlayedAt.ToLocalTime().ToString("MM/dd")<br />
-                        @m.PlayedAt.ToLocalTime().ToString("HH:mm")
-                    </div>
+                    <!-- 試合番号 -->
+                    @if (m.MatchIndex.HasValue)
+                    {
+                        <div style="font-size:11px; color:var(--text-dim); min-width:24px; text-align:center; font-weight:700;">
+                            #@m.MatchIndex
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="match-time">
+                            @m.PlayedAt.AddHours(9).ToString("MM/dd")<br />
+                            @m.PlayedAt.AddHours(9).ToString("HH:mm")
+                        </div>
+                    }
                     <div style="flex:1">
                         <div class="match-players">
                             <span class="match-winner">@winner?.Name</span>
@@ -122,12 +132,19 @@ else
                             }
                         </div>
                     </div>
-                    <!-- 編集ボタン -->
-                    <button @onclick="() => OpenEditModal(m)"
-                            style="background:none; border:1px solid var(--border); border-radius:6px;
-                                   color:var(--text-dim); cursor:pointer; padding:4px 10px; font-size:11px;">
-                        ✏️
-                    </button>
+                    <!-- 編集・削除ボタン -->
+                    <div style="display:flex; gap:4px;">
+                        <button @onclick="() => OpenEditModal(m)"
+                                style="background:none; border:1px solid var(--border); border-radius:6px;
+                                       color:var(--text-dim); cursor:pointer; padding:4px 10px; font-size:11px;">
+                            ✏️
+                        </button>
+                        <button @onclick="() => ConfirmDelete(m)"
+                                style="background:none; border:1px solid rgba(192,57,43,0.4); border-radius:6px;
+                                       color:var(--lose); cursor:pointer; padding:4px 10px; font-size:11px;">
+                            🗑️
+                        </button>
+                    </div>
                 </div>
 
                 <!-- メモ -->
@@ -151,6 +168,37 @@ else
     </div>
 }
 
+<!-- 削除確認モーダル -->
+@if (showDeleteConfirm && deletingMatch != null)
+{
+    var dWinner = playerMap.GetValueOrDefault(deletingMatch.WinnerPlayerId);
+    var dLoser = playerMap.GetValueOrDefault(deletingMatch.LoserPlayerId);
+    <div class="modal-overlay" @onclick="() => showDeleteConfirm = false">
+        <div class="modal" @onclick:stopPropagation>
+            <div class="modal-handle"></div>
+            <div class="modal-title" style="color:var(--lose);">🗑️ 試合を削除</div>
+            <div style="text-align:center; margin-bottom:20px; font-size:14px;">
+                @if (deletingMatch.MatchIndex.HasValue)
+                {
+                    <div style="color:var(--text-dim); margin-bottom:8px;">#@deletingMatch.MatchIndex</div>
+                }
+                <div><span class="match-winner">@dWinner?.Name</span> vs <span class="match-loser">@dLoser?.Name</span></div>
+                <div style="font-size:12px; color:var(--text-dim); margin-top:8px;">
+                    この試合を削除すると勝敗数・残デッキ数が元に戻ります。
+                </div>
+            </div>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+                <button class="btn-primary" @onclick="() => showDeleteConfirm = false">
+                    キャンセル
+                </button>
+                <button class="btn-danger" @onclick="ExecuteDelete" disabled="@deleteSubmitting">
+                    @(deleteSubmitting ? "削除中..." : "削除する")
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
 <!-- 編集モーダル -->
 @if (showEditModal && editingMatch != null)
 {
@@ -158,6 +206,19 @@ else
         <div class="modal" @onclick:stopPropagation>
             <div class="modal-handle"></div>
             <div class="modal-title">✏️ 試合結果の修正</div>
+
+            <!-- 試合番号 -->
+            <div class="form-label">🔢 試合番号</div>
+            <div style="display:flex; align-items:center; gap:8px; margin-bottom:16px;">
+                <span style="color:var(--text-dim); font-size:13px;">#</span>
+                <input type="number" class="text-input" @bind="editMatchIndex"
+                       style="margin-bottom:0; width:100px;"
+                       min="1" placeholder="番号" />
+                @if (editIndexDuplicate)
+                {
+                    <span style="font-size:11px; color:var(--lose);">⚠️ 重複しています</span>
+                }
+            </div>
 
             <!-- 勝者選択 -->
             <div class="form-label">🏆 勝者</div>
@@ -223,21 +284,23 @@ else
             <textarea class="text-input" @bind="editMemo" placeholder="試合のメモを入力..."
                       style="resize:vertical; min-height:60px;"></textarea>
 
-            @if (editErrorMessage != null)
-            {
-                <div class="error-msg">⚠️ @editErrorMessage</div>
-            }
-            @if (editWinnerId != editingMatch?.WinnerPlayerId || 
+            <!-- 変更警告 -->
+            @if (editWinnerId != editingMatch?.WinnerPlayerId ||
                  editLoserId != editingMatch?.LoserPlayerId ||
                  editLostDeckId != editingMatch?.LostDeckId)
             {
                 <div style="background:rgba(241,196,15,0.1); border:1px solid rgba(241,196,15,0.4);
-                            border-radius:8px; padding:12px 14px; margin-bottom:12px; font-size:12px;">
+                            border-radius:8px; padding:12px 14px; margin-top:12px; font-size:12px;">
                     ⚠️ 勝者・敗者・デッキを変更した場合、以降の試合のデッキ状態が正しくなくなる可能性があります。
-                    必要に応じて「デッキ」ページから手動で状態を修正してください。
                 </div>
             }
-            <button class="submit-btn" @onclick="SubmitEdit" disabled="@editSubmitting">
+
+            @if (editErrorMessage != null)
+            {
+                <div class="error-msg">⚠️ @editErrorMessage</div>
+            }
+
+            <button class="submit-btn" @onclick="SubmitEdit" disabled="@(editSubmitting || editIndexDuplicate)">
                 @(editSubmitting ? "更新中..." : "✅ 修正を確定する")
             </button>
         </div>
@@ -255,9 +318,16 @@ else
     private List<SeasonPlayer> standings = new();
     private bool loading = true;
 
+    // 削除
+    private bool showDeleteConfirm = false;
+    private Match? deletingMatch;
+    private bool deleteSubmitting = false;
+
     // 編集モーダル
     private bool showEditModal = false;
     private Match? editingMatch;
+    private int editMatchIndex = 0;
+    private bool editIndexDuplicate = false;
     private int editWinnerId = 0;
     private int editWinnerSeasonPlayerId = 0;
     private int editLoserId = 0;
@@ -309,9 +379,34 @@ else
         firstPlayerStats = MatchService.CalcFirstPlayerStats(matches);
     }
 
+    private void ConfirmDelete(Match m)
+    {
+        deletingMatch = m;
+        showDeleteConfirm = true;
+    }
+
+    private async Task ExecuteDelete()
+    {
+        if (deletingMatch == null) return;
+        deleteSubmitting = true;
+        try
+        {
+            await MatchService.DeleteMatchAsync(deletingMatch.Id);
+            showDeleteConfirm = false;
+            await SelectTournament(selectedTournament!);
+        }
+        catch (Exception ex)
+        {
+            // エラー処理
+        }
+        finally { deleteSubmitting = false; }
+    }
+
     private async Task OpenEditModal(Match m)
     {
         editingMatch = m;
+        editMatchIndex = m.MatchIndex ?? 0;
+        editIndexDuplicate = false;
         editWinnerId = m.WinnerPlayerId;
         editLoserId = m.LoserPlayerId;
         editWinnerDeckId = m.WinnerDeckId;
@@ -366,7 +461,17 @@ else
     private void SetEditWinnerNewDeckName(string name) => editWinnerNewDeckName = name;
     private void SetEditLostDeckId(int id) => editLostDeckId = id;
     private void SetEditLoserNewDeckName(string name) => editLoserNewDeckName = name;
+    private void AddToEditWinnerSeasonDecks(Deck deck) { if (!editWinnerSeasonDecks.Any(d => d.Id == deck.Id)) editWinnerSeasonDecks.Add(deck); }
+    private void AddToEditLoserSeasonDecks(Deck deck) { if (!editLoserSeasonDecks.Any(d => d.Id == deck.Id)) editLoserSeasonDecks.Add(deck); }
 
+    private async Task CheckIndexDuplicate()
+    {
+        if (editMatchIndex > 0)
+            editIndexDuplicate = await MatchService.IsMatchIndexDuplicateAsync(selectedTournamentId, editMatchIndex, editingMatch?.Id);
+        else
+            editIndexDuplicate = false;
+    }
+    
     private void AddToEditWinnerSeasonDecks(Deck deck)
     {
         if (!editWinnerSeasonDecks.Any(d => d.Id == deck.Id))
@@ -387,6 +492,10 @@ else
         if (editWinnerDeckId == 0 && string.IsNullOrWhiteSpace(editWinnerNewDeckName)) { editErrorMessage = "勝者のデッキを選択または入力してください"; return; }
         if (editLoserId == 0) { editErrorMessage = "敗者を選択してください"; return; }
         if (editLostDeckId == 0 && string.IsNullOrWhiteSpace(editLoserNewDeckName)) { editErrorMessage = "敗者のデッキを選択または入力してください"; return; }
+
+        // 重複チェック
+        await CheckIndexDuplicate();
+        if (editIndexDuplicate) { editErrorMessage = "試合番号が重複しています"; return; }
 
         editSubmitting = true;
         try
@@ -412,7 +521,8 @@ else
                 editWinnerId, editLoserId,
                 winnerDeckId, lostDeckId,
                 firstPlayerId,
-                string.IsNullOrWhiteSpace(editMemo) ? null : editMemo
+                string.IsNullOrWhiteSpace(editMemo) ? null : editMemo,
+                editMatchIndex > 0 ? editMatchIndex : null
             );
 
             showEditModal = false;

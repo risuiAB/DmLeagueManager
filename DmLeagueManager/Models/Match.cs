@@ -30,6 +30,9 @@ public class Match : BaseModel
     [Column("first_player_id")]
     public int? FirstPlayerId { get; set; }
 
+    [Column("match_index")]
+    public int? MatchIndex { get; set; }
+
     [Column("played_at")]
     public DateTime PlayedAt { get; set; }
 

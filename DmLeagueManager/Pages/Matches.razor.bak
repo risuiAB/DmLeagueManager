@@ -100,8 +100,8 @@ else
                 <!-- 試合情報行 -->
                 <div style="display:flex; align-items:center; gap:10px;">
                     <div class="match-time">
-                        @m.PlayedAt.ToLocalTime().ToString("MM/dd")<br />
-                        @m.PlayedAt.ToLocalTime().ToString("HH:mm")
+                        @m.PlayedAt.AddHours(9).ToString("MM/dd")<br />
+                        @m.PlayedAt.AddHours(9).ToString("HH:mm")
                     </div>
                     <div style="flex:1">
                         <div class="match-players">
@@ -122,10 +122,12 @@ else
                             }
                         </div>
                     </div>
-                    @if (lostDeck != null)
-                    {
-                        <div class="deck-lost-badge">💀 @lostDeck.Name</div>
-                    }
+                    <!-- 編集ボタン -->
+                    <button @onclick="() => OpenEditModal(m)"
+                            style="background:none; border:1px solid var(--border); border-radius:6px;
+                                   color:var(--text-dim); cursor:pointer; padding:4px 10px; font-size:11px;">
+                        ✏️
+                    </button>
                 </div>
 
                 <!-- メモ -->
@@ -149,6 +151,99 @@ else
     </div>
 }
 
+<!-- 編集モーダル -->
+@if (showEditModal && editingMatch != null)
+{
+    <div class="modal-overlay" @onclick="CloseEditModal">
+        <div class="modal" @onclick:stopPropagation>
+            <div class="modal-handle"></div>
+            <div class="modal-title">✏️ 試合結果の修正</div>
+
+            <!-- 勝者選択 -->
+            <div class="form-label">🏆 勝者</div>
+            <div class="player-buttons" style="margin-bottom:16px">
+                @foreach (var sp in standings)
+                {
+                    <button class="player-select-btn @(editWinnerId == sp.PlayerId ? "selected-win" : "")"
+                            @onclick="() => SelectEditWinner(sp)">
+                        @sp.Player?.Name
+                    </button>
+                }
+            </div>
+
+            <!-- 勝者デッキ -->
+            @if (editWinnerId > 0)
+            {
+                <div class="form-label">🃏 勝者のデッキ</div>
+                <DeckSelector SeasonDecks="@editWinnerSeasonDecks" AllDecks="@editWinnerAllDecks"
+                              SelectedDeckId="@editWinnerDeckId"
+                              ShowAll = "true"
+                              OnDeckSelected="SetEditWinnerDeckId" OnNewDeckName="SetEditWinnerNewDeckName"
+                              OnDeckAddedToSeason="AddToEditWinnerSeasonDecks" />
+            }
+
+            <!-- 敗者選択 -->
+            <div class="form-label" style="margin-top:16px">💀 敗者</div>
+            <div class="player-buttons" style="margin-bottom:16px">
+                @foreach (var sp in standings.Where(s => s.PlayerId != editWinnerId))
+                {
+                    <button class="player-select-btn @(editLoserId == sp.PlayerId ? "selected-lose" : "")"
+                            @onclick="() => SelectEditLoser(sp)">
+                        @sp.Player?.Name
+                    </button>
+                }
+            </div>
+
+            <!-- 敗者デッキ -->
+            @if (editLoserId > 0)
+            {
+                <div class="form-label">💀 敗者のデッキ</div>
+                <DeckSelector SeasonDecks="@editLoserSeasonDecks" AllDecks="@editLoserAllDecks"
+                              SelectedDeckId="@editLostDeckId"
+                              ShowAll="true"
+                              OnDeckSelected="SetEditLostDeckId" OnNewDeckName="SetEditLoserNewDeckName"
+                              OnDeckAddedToSeason="AddToEditLoserSeasonDecks" />
+            }
+
+            <!-- 先攻フラグ -->
+            <div class="form-label" style="margin-top:16px">⚡ 先攻</div>
+            <div style="background:var(--surface2); border:1px solid var(--border); border-radius:8px;
+                        padding:12px 14px; display:flex; align-items:center; gap:10px; margin-bottom:16px;">
+                <input type="checkbox" id="editFirstCheck"
+                       checked="@editWinnerIsFirst"
+                       @onchange="e => editWinnerIsFirst = (bool)e.Value!"
+                       style="width:18px; height:18px; cursor:pointer;" />
+                <label for="editFirstCheck" style="font-size:13px; cursor:pointer;">
+                    勝者（@(standings.FirstOrDefault(s => s.PlayerId == editWinnerId)?.Player?.Name ?? "？")）が先攻
+                </label>
+            </div>
+
+            <!-- メモ -->
+            <div class="form-label">📝 メモ（任意）</div>
+            <textarea class="text-input" @bind="editMemo" placeholder="試合のメモを入力..."
+                      style="resize:vertical; min-height:60px;"></textarea>
+
+            @if (editErrorMessage != null)
+            {
+                <div class="error-msg">⚠️ @editErrorMessage</div>
+            }
+            @if (editWinnerId != editingMatch?.WinnerPlayerId || 
+                 editLoserId != editingMatch?.LoserPlayerId ||
+                 editLostDeckId != editingMatch?.LostDeckId)
+            {
+                <div style="background:rgba(241,196,15,0.1); border:1px solid rgba(241,196,15,0.4);
+                            border-radius:8px; padding:12px 14px; margin-bottom:12px; font-size:12px;">
+                    ⚠️ 勝者・敗者・デッキを変更した場合、以降の試合のデッキ状態が正しくなくなる可能性があります。
+                    必要に応じて「デッキ」ページから手動で状態を修正してください。
+                </div>
+            }
+            <button class="submit-btn" @onclick="SubmitEdit" disabled="@editSubmitting">
+                @(editSubmitting ? "更新中..." : "✅ 修正を確定する")
+            </button>
+        </div>
+    </div>
+}
+
 @code {
     private List<Match> matches = new();
     private List<Tournament> allTournaments = new();
@@ -157,7 +252,28 @@ else
     private Dictionary<int, Player> playerMap = new();
     private Dictionary<int, Deck> deckMap = new();
     private FirstPlayerStats firstPlayerStats = new();
+    private List<SeasonPlayer> standings = new();
     private bool loading = true;
+
+    // 編集モーダル
+    private bool showEditModal = false;
+    private Match? editingMatch;
+    private int editWinnerId = 0;
+    private int editWinnerSeasonPlayerId = 0;
+    private int editLoserId = 0;
+    private int editLoserSeasonPlayerId = 0;
+    private int editWinnerDeckId = 0;
+    private string editWinnerNewDeckName = "";
+    private int editLostDeckId = 0;
+    private string editLoserNewDeckName = "";
+    private bool editWinnerIsFirst = true;
+    private string editMemo = "";
+    private List<Deck> editWinnerSeasonDecks = new();
+    private List<Deck> editWinnerAllDecks = new();
+    private List<Deck> editLoserSeasonDecks = new();
+    private List<Deck> editLoserAllDecks = new();
+    private string? editErrorMessage;
+    private bool editSubmitting = false;
 
     protected override async Task OnInitializedAsync()
     {
@@ -180,17 +296,129 @@ else
         selectedTournament = t;
         selectedTournamentId = t.Id;
         matches = await MatchService.GetTournamentMatchesAsync(t.Id);
+        standings = await PlayerService.GetTournamentStandingsAsync(t.Id);
 
         deckMap.Clear();
-        var standings = await PlayerService.GetTournamentStandingsAsync(t.Id);
         foreach (var sp in standings)
         {
             var decks = await DeckService.GetBySeasonPlayerAsync(sp.Id);
-            foreach (var d in decks)
-                deckMap[d.Id] = d;
+            foreach (var d in decks) deckMap[d.Id] = d;
         }
 
         // 先攻勝率計算
         firstPlayerStats = MatchService.CalcFirstPlayerStats(matches);
+    }
+
+    private async Task OpenEditModal(Match m)
+    {
+        editingMatch = m;
+        editWinnerId = m.WinnerPlayerId;
+        editLoserId = m.LoserPlayerId;
+        editWinnerDeckId = m.WinnerDeckId;
+        editLostDeckId = m.LostDeckId;
+        editWinnerIsFirst = m.FirstPlayerId == m.WinnerPlayerId;
+        editMemo = m.Memo ?? "";
+        editErrorMessage = null;
+
+        var winnerSp = standings.FirstOrDefault(s => s.PlayerId == m.WinnerPlayerId);
+        var loserSp = standings.FirstOrDefault(s => s.PlayerId == m.LoserPlayerId);
+
+        if (winnerSp != null)
+        {
+            editWinnerSeasonPlayerId = winnerSp.Id;
+            editWinnerSeasonDecks = await DeckService.GetBySeasonPlayerAsync(winnerSp.Id);
+            editWinnerAllDecks = await DeckService.GetAllByPlayerAsync(winnerSp.PlayerId);
+        }
+
+        if (loserSp != null)
+        {
+            editLoserSeasonPlayerId = loserSp.Id;
+            editLoserSeasonDecks = await DeckService.GetBySeasonPlayerAsync(loserSp.Id);
+            editLoserAllDecks = await DeckService.GetAllByPlayerAsync(loserSp.PlayerId);
+        }
+
+        showEditModal = true;
+    }
+
+    private void CloseEditModal() => showEditModal = false;
+
+    private async Task SelectEditWinner(SeasonPlayer sp)
+    {
+        editWinnerId = sp.PlayerId;
+        editWinnerSeasonPlayerId = sp.Id;
+        editWinnerDeckId = 0;
+        editWinnerNewDeckName = "";
+        editWinnerSeasonDecks = await DeckService.GetBySeasonPlayerAsync(sp.Id);
+        editWinnerAllDecks = await DeckService.GetAllByPlayerAsync(sp.PlayerId);
+    }
+
+    private async Task SelectEditLoser(SeasonPlayer sp)
+    {
+        editLoserId = sp.PlayerId;
+        editLoserSeasonPlayerId = sp.Id;
+        editLostDeckId = 0;
+        editLoserNewDeckName = "";
+        editLoserSeasonDecks = await DeckService.GetBySeasonPlayerAsync(sp.Id);
+        editLoserAllDecks = await DeckService.GetAllByPlayerAsync(sp.PlayerId);
+    }
+
+    private void SetEditWinnerDeckId(int id) => editWinnerDeckId = id;
+    private void SetEditWinnerNewDeckName(string name) => editWinnerNewDeckName = name;
+    private void SetEditLostDeckId(int id) => editLostDeckId = id;
+    private void SetEditLoserNewDeckName(string name) => editLoserNewDeckName = name;
+
+    private void AddToEditWinnerSeasonDecks(Deck deck)
+    {
+        if (!editWinnerSeasonDecks.Any(d => d.Id == deck.Id))
+            editWinnerSeasonDecks.Add(deck);
+    }
+
+    private void AddToEditLoserSeasonDecks(Deck deck)
+    {
+        if (!editLoserSeasonDecks.Any(d => d.Id == deck.Id))
+            editLoserSeasonDecks.Add(deck);
+    }
+
+    private async Task SubmitEdit()
+    {
+        editErrorMessage = null;
+
+        if (editWinnerId == 0) { editErrorMessage = "勝者を選択してください"; return; }
+        if (editWinnerDeckId == 0 && string.IsNullOrWhiteSpace(editWinnerNewDeckName)) { editErrorMessage = "勝者のデッキを選択または入力してください"; return; }
+        if (editLoserId == 0) { editErrorMessage = "敗者を選択してください"; return; }
+        if (editLostDeckId == 0 && string.IsNullOrWhiteSpace(editLoserNewDeckName)) { editErrorMessage = "敗者のデッキを選択または入力してください"; return; }
+
+        editSubmitting = true;
+        try
+        {
+            int winnerDeckId = editWinnerDeckId;
+            if (winnerDeckId == 0)
+            {
+                var deck = await DeckService.RegisterDeckAsync(editWinnerSeasonPlayerId, editWinnerId, editWinnerNewDeckName);
+                winnerDeckId = deck.Id;
+            }
+
+            int lostDeckId = editLostDeckId;
+            if (lostDeckId == 0)
+            {
+                var deck = await DeckService.RegisterDeckAsync(editLoserSeasonPlayerId, editLoserId, editLoserNewDeckName);
+                lostDeckId = deck.Id;
+            }
+
+            int firstPlayerId = editWinnerIsFirst ? editWinnerId : editLoserId;
+
+            await MatchService.UpdateMatchAsync(
+                editingMatch!.Id,
+                editWinnerId, editLoserId,
+                winnerDeckId, lostDeckId,
+                firstPlayerId,
+                string.IsNullOrWhiteSpace(editMemo) ? null : editMemo
+            );
+
+            showEditModal = false;
+            await SelectTournament(selectedTournament!);
+        }
+        catch (Exception ex) { editErrorMessage = $"エラー: {ex.Message}"; }
+        finally { editSubmitting = false; }
     }
 }

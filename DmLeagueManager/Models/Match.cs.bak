@@ -27,6 +27,9 @@ public class Match : BaseModel
     [Column("lost_deck_id")]
     public int LostDeckId { get; set; }
 
+    [Column("first_player_id")]
+    public int? FirstPlayerId { get; set; }
+
     [Column("played_at")]
     public DateTime PlayedAt { get; set; }
 
@@ -42,4 +45,10 @@ public class Match : BaseModel
     public Deck? WinnerDeck { get; set; }
     [Newtonsoft.Json.JsonIgnore]
     public Deck? LostDeck { get; set; }
+
+    // 先攻が勝ったかどうか
+    [Newtonsoft.Json.JsonIgnore]
+    public bool? FirstPlayerWon => FirstPlayerId.HasValue
+        ? FirstPlayerId == WinnerPlayerId
+        : null;
 }

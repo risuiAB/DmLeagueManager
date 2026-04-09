@@ -23,10 +23,29 @@ public class MatchService(Client supabase, AppConfig config)
         return result.Models;
     }
 
+    public async Task<List<Match>> GetSeasonMatchesAsync(int seasonId)
+    {
+        if (config.UseMock)
+        {
+            await Task.Delay(150);
+            return MockData.Matches
+                .Where(m => m.SeasonId == seasonId)
+                .OrderByDescending(m => m.PlayedAt)
+                .ToList();
+        }
+
+        var result = await supabase.From<Match>()
+            .Where(m => m.SeasonId == seasonId)
+            .Order("played_at", Supabase.Postgrest.Constants.Ordering.Descending)
+            .Get();
+        return result.Models;
+    }
+
     public async Task<MatchResult> RecordMatchAsync(
         int seasonId, int tournamentId,
         int winnerPlayerId, int loserPlayerId,
         int winnerDeckId, int lostDeckId,
+        int? firstPlayerId = null,
         string? memo = null)
     {
         if (config.UseMock)
@@ -42,6 +61,7 @@ public class MatchService(Client supabase, AppConfig config)
                 LoserPlayerId = loserPlayerId,
                 WinnerDeckId = winnerDeckId,
                 LostDeckId = lostDeckId,
+                FirstPlayerId = firstPlayerId,
                 Memo = memo,
                 PlayedAt = DateTime.Now
             };
@@ -71,7 +91,7 @@ public class MatchService(Client supabase, AppConfig config)
                     int eliminatedCount = MockData.SeasonPlayers.Count(sp => sp.TournamentId == tournamentId && sp.Rank != null);
                     int actualRank = totalPlayers - eliminatedCount;
                     loserSp.Rank = actualRank;
-                    int rankPoints = actualRank switch { 1 => 3, 2 => 1, _ => 0 };
+                    int rankPoints = actualRank switch { 1 => 4, 2 => 1, _ => 0 };
                     loserSp.TotalPoints = rankPoints + loserSp.DeckDiff;
                     eliminated = true;
                     eliminatedRank = actualRank;
@@ -85,8 +105,7 @@ public class MatchService(Client supabase, AppConfig config)
                     {
                         var lastPlayer = remaining.First();
                         lastPlayer.Rank = 1;
-                        int lastRankPoints = 4; // 1位の点数
-                        lastPlayer.TotalPoints = lastRankPoints + lastPlayer.DeckDiff;
+                        lastPlayer.TotalPoints = 3 + lastPlayer.DeckDiff;
                     }
                 }
             }
@@ -103,6 +122,7 @@ public class MatchService(Client supabase, AppConfig config)
             LoserPlayerId = loserPlayerId,
             WinnerDeckId = winnerDeckId,
             LostDeckId = lostDeckId,
+            FirstPlayerId = firstPlayerId,
             Memo = memo,
             PlayedAt = DateTime.UtcNow
         };
@@ -144,12 +164,11 @@ public class MatchService(Client supabase, AppConfig config)
                 var allAfter = await supabase.From<SeasonPlayer>()
                     .Where(sp => sp.TournamentId == tournamentId).Get();
                 var remaining = allAfter.Models.Where(sp => sp.Rank == null).ToList();
-
                 if (remaining.Count == 1)
                 {
                     var lastPlayer = remaining.First();
                     lastPlayer.Rank = 1;
-                    lastPlayer.TotalPoints = 4 + lastPlayer.DeckDiff; // 1位の点数
+                    lastPlayer.TotalPoints = 3 + lastPlayer.DeckDiff; // 1位の点数
                     await supabase.From<SeasonPlayer>().Update(lastPlayer);
                 }
             }
@@ -166,6 +185,68 @@ public class MatchService(Client supabase, AppConfig config)
             EliminatedRank = eliminatedRankReal
         };
     }
+
+    /// <summary>先攻勝率統計を計算</summary>
+    public FirstPlayerStats CalcFirstPlayerStats(List<Match> matches, int? playerId = null, int? deckId = null)
+    {
+        var filtered = matches.Where(m => m.FirstPlayerId.HasValue).ToList();
+
+        if (playerId.HasValue)
+        {
+            // そのプレイヤーが先攻だった試合のみ
+            filtered = filtered.Where(m => m.FirstPlayerId == playerId).ToList();
+        }
+
+        if (deckId.HasValue)
+        {
+            filtered = filtered.Where(m => m.WinnerDeckId == deckId || m.LostDeckId == deckId).ToList();
+        }
+
+        int total = filtered.Count;
+        int firstWin = filtered.Count(m => m.FirstPlayerId == m.WinnerPlayerId);
+
+        return new FirstPlayerStats
+        {
+            TotalGames = total,
+            FirstPlayerWins = firstWin,
+            FirstPlayerWinRate = total == 0 ? 0 : Math.Round((double)firstWin / total * 100, 1)
+        };
+    }
+
+    public async Task UpdateMatchAsync(
+    int matchId,
+    int winnerPlayerId,
+    int loserPlayerId,
+    int winnerDeckId,
+    int lostDeckId,
+    int? firstPlayerId,
+    string? memo)
+    {
+        if (config.UseMock)
+        {
+            await Task.Delay(300);
+            var match = MockData.Matches.FirstOrDefault(m => m.Id == matchId);
+            if (match == null) return;
+            match.WinnerPlayerId = winnerPlayerId;
+            match.LoserPlayerId = loserPlayerId;
+            match.WinnerDeckId = winnerDeckId;
+            match.LostDeckId = lostDeckId;
+            match.FirstPlayerId = firstPlayerId;
+            match.Memo = memo;
+            return;
+        }
+
+        await supabase.Rpc("update_match", new
+        {
+            p_match_id = matchId,
+            p_winner_player_id = winnerPlayerId,
+            p_loser_player_id = loserPlayerId,
+            p_winner_deck_id = winnerDeckId,
+            p_lost_deck_id = lostDeckId,
+            p_first_player_id = firstPlayerId,
+            p_memo = memo
+        });
+    }
 }
 
 public class MatchResult
@@ -174,4 +255,11 @@ public class MatchResult
     public bool WinnerEliminated { get; set; }
     public bool LoserEliminated { get; set; }
     public int? EliminatedRank { get; set; }
+}
+
+public class FirstPlayerStats
+{
+    public int TotalGames { get; set; }
+    public int FirstPlayerWins { get; set; }
+    public double FirstPlayerWinRate { get; set; }
 }
