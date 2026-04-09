@@ -148,7 +148,7 @@ else
                 <div class="form-label">🃏 勝者のデッキ</div>
                 <DeckSelector SeasonDecks="@winnerSeasonDecks" AllDecks="@winnerAllDecks"
                     SelectedDeckId="@selectedWinnerDeckId"
-                    ShowAll = "true"
+                    ShowAll = "false"
                     OnDeckSelected="SetWinnerDeckId" OnNewDeckName="SetWinnerNewDeckName"
                     OnDeckAddedToSeason="AddToWinnerSeasonDecks" />
             }
@@ -167,7 +167,7 @@ else
                 <div class="form-label">💀 敗者のデッキ（消滅します）</div>
                 <DeckSelector SeasonDecks="@loserSeasonDecks" AllDecks="@loserAllDecks"
                     SelectedDeckId="@selectedLostDeckId"
-                    ShowAll="true"
+                    ShowAll="false"
                     OnDeckSelected="SetLostDeckId" OnNewDeckName="SetLoserNewDeckName"
                     OnDeckAddedToSeason="AddToLoserSeasonDecks" />
             }

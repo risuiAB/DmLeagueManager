@@ -22,8 +22,8 @@
                 @foreach (var deck in ShowAll ? SeasonDecks : SeasonDecks.Where(d => d.IsActive))
                 {
                     <div class="deck-select-item @(SelectedDeckId == deck.Id ? "selected" : "")"
-                         style="@(!deck.IsActive ? "opacity:0.5;" : "")"
-                         @onclick="() => SelectDeck(deck.Id)">
+                         style="@(!deck.IsActive && !ShowAll ? "opacity:0.5; cursor:not-allowed;" : "")"
+                         @onclick="() => { if (deck.IsActive || ShowAll) SelectDeck(deck.Id); }">
                         <span>@deck.Name</span>
                         <span style="font-size:11px; color:@(deck.IsActive ? "var(--win)" : "var(--lose)")">
                             @(deck.IsActive ? "使用可" : "消滅済")
@@ -41,8 +41,8 @@
             @foreach (var deck in ShowAll ? AllDecks : AllDecks.Where(d => d.IsActive))
             {
                 <div class="deck-select-item @(SelectedDeckId == deck.Id ? "selected" : "")"
-                     style="@(!deck.IsActive ? "opacity:0.5;" : "")"
-                     @onclick="() => SelectDeckFromHistory(deck)">
+                     style="@(!deck.IsActive && !ShowAll ? "opacity:0.5; cursor:not-allowed;" : "")"
+                     @onclick="() => { if (deck.IsActive || ShowAll) SelectDeckFromHistory(deck); }">
                     <span>@deck.Name</span>
                     <span style="font-size:11px; color:@(deck.IsActive ? "var(--win)" : "var(--lose)")">
                         @(deck.IsActive ? "使用可" : "消滅済")
