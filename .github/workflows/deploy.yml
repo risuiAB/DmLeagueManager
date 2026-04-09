@@ -11,13 +11,15 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: List files
+        run: find . -name "*.csproj"
+
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '9.0.x'
-      - name: List files
-        run: |
-          find . -name "*.csproj"
+
       - name: Write Supabase config
         run: |
           mkdir -p DmLeagueManager/wwwroot
@@ -29,17 +31,22 @@ jobs:
             }
           }
           EOF
-      
+
       - name: Publish
         run: |
           dotnet publish DmLeagueManager/DmLeagueManager.csproj \
             -c Release \
             -o release \
             --nologo
+
       - name: Fix base href for GitHub Pages
         run: |
           REPO_NAME=$(echo "${{ github.repository }}" | cut -d'/' -f2)
           sed -i "s|<base href=\"/\" />|<base href=\"/$REPO_NAME/\" />|g" release/wwwroot/index.html
+
+      - name: Add .nojekyll
+        run: touch release/wwwroot/.nojekyll
+
       - name: Add 404.html for SPA routing
         run: |
           REPO_NAME=$(echo "${{ github.repository }}" | cut -d'/' -f2)
@@ -56,10 +63,7 @@ jobs:
           <body></body>
           </html>
           HTMLEOF
-      - name: Fix index.html redirect
-        run: |
-          REPO_NAME=$(echo "${{ github.repository }}" | cut -d'/' -f2)
-          sed -i "s|</title>|</title><script>var r=sessionStorage.redirect;delete sessionStorage.redirect;if(r&&r!==location.href){history.replaceState(null,null,r);}</script>|" release/wwwroot/index.html
+
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
         with:
