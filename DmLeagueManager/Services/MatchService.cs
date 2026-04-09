@@ -212,6 +212,41 @@ public class MatchService(Client supabase, AppConfig config)
             FirstPlayerWinRate = total == 0 ? 0 : Math.Round((double)firstWin / total * 100, 1)
         };
     }
+
+    public async Task UpdateMatchAsync(
+    int matchId,
+    int winnerPlayerId,
+    int loserPlayerId,
+    int winnerDeckId,
+    int lostDeckId,
+    int? firstPlayerId,
+    string? memo)
+    {
+        if (config.UseMock)
+        {
+            await Task.Delay(300);
+            var match = MockData.Matches.FirstOrDefault(m => m.Id == matchId);
+            if (match == null) return;
+            match.WinnerPlayerId = winnerPlayerId;
+            match.LoserPlayerId = loserPlayerId;
+            match.WinnerDeckId = winnerDeckId;
+            match.LostDeckId = lostDeckId;
+            match.FirstPlayerId = firstPlayerId;
+            match.Memo = memo;
+            return;
+        }
+
+        await supabase.Rpc("update_match", new
+        {
+            p_match_id = matchId,
+            p_winner_player_id = winnerPlayerId,
+            p_loser_player_id = loserPlayerId,
+            p_winner_deck_id = winnerDeckId,
+            p_lost_deck_id = lostDeckId,
+            p_first_player_id = firstPlayerId,
+            p_memo = memo
+        });
+    }
 }
 
 public class MatchResult
