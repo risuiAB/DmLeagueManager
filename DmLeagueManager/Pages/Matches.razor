@@ -175,10 +175,11 @@ else
             @if (editWinnerId > 0)
             {
                 <div class="form-label">🃏 勝者のデッキ</div>
-                <DeckSelector SeasonDecks="@winnerSeasonDecks" AllDecks="@winnerAllDecks"
-                    SelectedDeckId="@selectedWinnerDeckId"
-                    OnDeckSelected="SetWinnerDeckId" OnNewDeckName="SetWinnerNewDeckName"
-                    OnDeckAddedToSeason="AddToWinnerSeasonDecks" />
+                <DeckSelector SeasonDecks="@editWinnerSeasonDecks" AllDecks="@editWinnerAllDecks"
+                              SelectedDeckId="@editWinnerDeckId"
+                              ShowAll = "true"
+                              OnDeckSelected="SetEditWinnerDeckId" OnNewDeckName="SetEditWinnerNewDeckName"
+                              OnDeckAddedToSeason="AddToEditWinnerSeasonDecks" />
             }
 
             <!-- 敗者選択 -->
@@ -197,10 +198,11 @@ else
             @if (editLoserId > 0)
             {
                 <div class="form-label">💀 敗者のデッキ</div>
-                <DeckSelector SeasonDecks="@loserSeasonDecks" AllDecks="@loserAllDecks"
-                    SelectedDeckId="@selectedLostDeckId"
-                    OnDeckSelected="SetLostDeckId" OnNewDeckName="SetLoserNewDeckName"
-                    OnDeckAddedToSeason="AddToLoserSeasonDecks" />
+                <DeckSelector SeasonDecks="@editLoserSeasonDecks" AllDecks="@editLoserAllDecks"
+                              SelectedDeckId="@editLostDeckId"
+                              ShowAll="true"
+                              OnDeckSelected="SetEditLostDeckId" OnNewDeckName="SetEditLoserNewDeckName"
+                              OnDeckAddedToSeason="AddToEditLoserSeasonDecks" />
             }
 
             <!-- 先攻フラグ -->
@@ -365,16 +367,16 @@ else
     private void SetEditLostDeckId(int id) => editLostDeckId = id;
     private void SetEditLoserNewDeckName(string name) => editLoserNewDeckName = name;
 
-    private void AddToWinnerSeasonDecks(Deck deck)
+    private void AddToEditWinnerSeasonDecks(Deck deck)
     {
-        if (!winnerSeasonDecks.Any(d => d.Id == deck.Id))
-            winnerSeasonDecks.Add(deck);
+        if (!editWinnerSeasonDecks.Any(d => d.Id == deck.Id))
+            editWinnerSeasonDecks.Add(deck);
     }
 
-    private void AddToLoserSeasonDecks(Deck deck)
+    private void AddToEditLoserSeasonDecks(Deck deck)
     {
-        if (!loserSeasonDecks.Any(d => d.Id == deck.Id))
-            loserSeasonDecks.Add(deck);
+        if (!editLoserSeasonDecks.Any(d => d.Id == deck.Id))
+            editLoserSeasonDecks.Add(deck);
     }
 
     private async Task SubmitEdit()
