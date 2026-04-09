@@ -1,7 +1,7 @@
 {
   "mainAssemblyName": "DmLeagueManager",
   "resources": {
-    "hash": "sha256-ujlveZes1T6fTIZfGxPAJ1ll7awh3U9sR7SftxUOlUw=",
+    "hash": "sha256-boxkUuc7+nr9EmmZe/Arwtv+kcFMVSKUnm/2XFX2y0Q=",
     "fingerprinting": {
       "Microsoft.AspNetCore.Components.zdmvynwsft.wasm": "Microsoft.AspNetCore.Components.wasm",
       "Microsoft.AspNetCore.Components.Web.m6bakpaqcj.wasm": "Microsoft.AspNetCore.Components.Web.wasm",
@@ -91,7 +91,7 @@
       "System.dqfxtvioy0.wasm": "System.wasm",
       "netstandard.1o1tcnv2kb.wasm": "netstandard.wasm",
       "System.Private.CoreLib.mv3mzzisfd.wasm": "System.Private.CoreLib.wasm",
-      "DmLeagueManager.c74n9fqcc3.wasm": "DmLeagueManager.wasm",
+      "DmLeagueManager.qgmize3kwb.wasm": "DmLeagueManager.wasm",
       "dotnet.js": "dotnet.js",
       "dotnet.native.l1ds2rhypd.js": "dotnet.native.js",
       "dotnet.native.etgrtk5jba.wasm": "dotnet.native.wasm",
@@ -205,7 +205,7 @@
       "System.Xml.XDocument.75levxgv6x.wasm": "sha256-i8U4glWpuGMEh+O3BBgRUOr/HIGK3otm6Vb3FozG/1w=",
       "System.dqfxtvioy0.wasm": "sha256-5QZAjy4n7513fYxCXSXTsAkUmRsLiZ8m621Ot4k7FB0=",
       "netstandard.1o1tcnv2kb.wasm": "sha256-sWUcQlHKuUd9Y/r4TSXTVaCY2lojZFMqBnSXR1w6WnA=",
-      "DmLeagueManager.c74n9fqcc3.wasm": "sha256-CFox3A7VvSpCcoHVKbVGMMosar3e+ZhuNgogAydxWkE="
+      "DmLeagueManager.qgmize3kwb.wasm": "sha256-xpJmhVP++W+1KHrCfrLJAYd/dr+lXYKjllh74nb1pbU="
     }
   },
   "cacheBootResources": true,
