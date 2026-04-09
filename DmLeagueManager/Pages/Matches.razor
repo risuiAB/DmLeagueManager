@@ -223,7 +223,16 @@ else
             {
                 <div class="error-msg">⚠️ @editErrorMessage</div>
             }
-
+            @if (editWinnerId != editingMatch?.WinnerPlayerId || 
+                 editLoserId != editingMatch?.LoserPlayerId ||
+                 editLostDeckId != editingMatch?.LostDeckId)
+            {
+                <div style="background:rgba(241,196,15,0.1); border:1px solid rgba(241,196,15,0.4);
+                            border-radius:8px; padding:12px 14px; margin-bottom:12px; font-size:12px;">
+                    ⚠️ 勝者・敗者・デッキを変更した場合、以降の試合のデッキ状態が正しくなくなる可能性があります。
+                    必要に応じて「デッキ」ページから手動で状態を修正してください。
+                </div>
+            }
             <button class="submit-btn" @onclick="SubmitEdit" disabled="@editSubmitting">
                 @(editSubmitting ? "更新中..." : "✅ 修正を確定する")
             </button>
