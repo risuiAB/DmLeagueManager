@@ -148,7 +148,8 @@ else
                 <div class="form-label">🃏 勝者のデッキ</div>
                 <DeckSelector SeasonDecks="@winnerSeasonDecks" AllDecks="@winnerAllDecks"
                     SelectedDeckId="@selectedWinnerDeckId"
-                    OnDeckSelected="SetWinnerDeckId" OnNewDeckName="SetWinnerNewDeckName" />
+                    OnDeckSelected="SetWinnerDeckId" OnNewDeckName="SetWinnerNewDeckName"
+                    OnDeckAddedToSeason="AddToWinnerSeasonDecks" />
             }
 
             <div class="form-label" style="margin-top:16px">💀 敗者</div>
@@ -165,7 +166,8 @@ else
                 <div class="form-label">💀 敗者のデッキ（消滅します）</div>
                 <DeckSelector SeasonDecks="@loserSeasonDecks" AllDecks="@loserAllDecks"
                     SelectedDeckId="@selectedLostDeckId"
-                    OnDeckSelected="SetLostDeckId" OnNewDeckName="SetLoserNewDeckName" />
+                    OnDeckSelected="SetLostDeckId" OnNewDeckName="SetLoserNewDeckName"
+                    OnDeckAddedToSeason="AddToLoserSeasonDecks" />
             }
             <div class="form-label" style="margin-top:16px">⚡ 先攻</div>
             <div style="background:var(--surface2); border:1px solid var(--border); border-radius:8px;
@@ -285,6 +287,18 @@ else
     private void SetWinnerNewDeckName(string name) => winnerNewDeckName = name;
     private void SetLostDeckId(int id) => selectedLostDeckId = id;
     private void SetLoserNewDeckName(string name) => loserNewDeckName = name;
+
+    private void AddToWinnerSeasonDecks(Deck deck)
+    {
+        if (!winnerSeasonDecks.Any(d => d.Id == deck.Id))
+        winnerSeasonDecks.Add(deck);
+    }
+
+    private void AddToLoserSeasonDecks(Deck deck)
+    {
+        if (!loserSeasonDecks.Any(d => d.Id == deck.Id))
+            loserSeasonDecks.Add(deck);
+    }
 
     private async Task SubmitMatch()
     {

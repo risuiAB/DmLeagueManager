@@ -19,15 +19,10 @@
         else
         {
             <div class="deck-list">
-                @foreach (var deck in SeasonDecks)
+                @foreach (var deck in ShowAll ? SeasonDecks : SeasonDecks.Where(d => d.IsActive))
                 {
                     <div class="deck-select-item @(SelectedDeckId == deck.Id ? "selected" : "")"
-                         @onclick="async () => 
-                         {
-                             if(deck.IsActive){
-                                await SelectDeck(deck.Id);
-                             }
-                         }">
+                        @onclick="() => SelectDeck(deck.Id)">
                         <span>@deck.Name</span>
                         <span style="font-size:11px; color:@(deck.IsActive ? "var(--win)" : "var(--lose)")">
                             @(deck.IsActive ? "使用可" : "消滅済")
@@ -41,22 +36,18 @@
     <!-- 全履歴デッキ一覧 -->
     @if (mode == "all")
     {
-        @if (!AllDecks.Any())
-        {
-            <div class="deck-empty">デッキ履歴がありません</div>
-        }
-        else
-        {
-            <div class="deck-list">
-                @foreach (var deck in AllDecks.Where(d=>d.IsActive))
-                {
-                    <div class="deck-select-item @(SelectedDeckId == deck.Id ? "selected" : "")"
-                         @onclick="() => SelectDeck(deck.Id)">
-                        <span>@deck.Name</span>
-                    </div>
-                }
-            </div>
-        }
+        <div class="deck-list">
+            @foreach (var deck in ShowAll ? AllDecks : AllDecks.Where(d => d.IsActive))
+            {
+                <div class="deck-select-item @(SelectedDeckId == deck.Id ? "selected" : "")"
+                     @onclick="() => SelectDeckFromHistory(deck)">
+                    <span>@deck.Name</span>
+                    <span style="font-size:11px; color:@(deck.IsActive ? "var(--win)" : "var(--lose)")">
+                        @(deck.IsActive ? "使用可" : "消滅済")
+                    </span>
+                </div>
+            }
+        </div>
     }
 
     <!-- 新規入力 -->
@@ -77,6 +68,8 @@
     [Parameter] public int SelectedDeckId { get; set; }
     [Parameter] public EventCallback<int> OnDeckSelected { get; set; }
     [Parameter] public EventCallback<string> OnNewDeckName { get; set; }
+    [Parameter] public EventCallback<Deck> OnDeckAddedToSeason { get; set; }
+    [Parameter] public bool ShowAll { get; set; } = false;
 
     private string mode = "season";
     private string newName = "";
@@ -94,6 +87,13 @@
         await OnNewDeckName.InvokeAsync(newName);
     }
 
+    private async Task SelectDeckFromHistory(Deck deck)
+    {
+        await SelectDeck(deck.Id);
+        // 今シーズンタブにも追加して切り替える
+        await OnDeckAddedToSeason.InvokeAsync(deck);
+        mode = "season";
+    }
     private void SetModeSeason() => mode = "season";
     private void SetModeAll() => mode = "all";
     private void SetModeNew() => mode = "new";

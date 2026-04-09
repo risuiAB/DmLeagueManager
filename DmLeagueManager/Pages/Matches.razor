@@ -175,9 +175,10 @@ else
             @if (editWinnerId > 0)
             {
                 <div class="form-label">🃏 勝者のデッキ</div>
-                <DeckSelector SeasonDecks="@editWinnerSeasonDecks" AllDecks="@editWinnerAllDecks"
-                    SelectedDeckId="@editWinnerDeckId"
-                    OnDeckSelected="SetEditWinnerDeckId" OnNewDeckName="SetEditWinnerNewDeckName" />
+                <DeckSelector SeasonDecks="@winnerSeasonDecks" AllDecks="@winnerAllDecks"
+                    SelectedDeckId="@selectedWinnerDeckId"
+                    OnDeckSelected="SetWinnerDeckId" OnNewDeckName="SetWinnerNewDeckName"
+                    OnDeckAddedToSeason="AddToWinnerSeasonDecks" />
             }
 
             <!-- 敗者選択 -->
@@ -196,9 +197,10 @@ else
             @if (editLoserId > 0)
             {
                 <div class="form-label">💀 敗者のデッキ</div>
-                <DeckSelector SeasonDecks="@editLoserSeasonDecks" AllDecks="@editLoserAllDecks"
-                    SelectedDeckId="@editLostDeckId"
-                    OnDeckSelected="SetEditLostDeckId" OnNewDeckName="SetEditLoserNewDeckName" />
+                <DeckSelector SeasonDecks="@loserSeasonDecks" AllDecks="@loserAllDecks"
+                    SelectedDeckId="@selectedLostDeckId"
+                    OnDeckSelected="SetLostDeckId" OnNewDeckName="SetLoserNewDeckName"
+                    OnDeckAddedToSeason="AddToLoserSeasonDecks" />
             }
 
             <!-- 先攻フラグ -->
@@ -362,6 +364,18 @@ else
     private void SetEditWinnerNewDeckName(string name) => editWinnerNewDeckName = name;
     private void SetEditLostDeckId(int id) => editLostDeckId = id;
     private void SetEditLoserNewDeckName(string name) => editLoserNewDeckName = name;
+
+    private void AddToWinnerSeasonDecks(Deck deck)
+    {
+        if (!winnerSeasonDecks.Any(d => d.Id == deck.Id))
+            winnerSeasonDecks.Add(deck);
+    }
+
+    private void AddToLoserSeasonDecks(Deck deck)
+    {
+        if (!loserSeasonDecks.Any(d => d.Id == deck.Id))
+            loserSeasonDecks.Add(deck);
+    }
 
     private async Task SubmitEdit()
     {
