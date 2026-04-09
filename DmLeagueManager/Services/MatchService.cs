@@ -338,26 +338,7 @@ public class MatchService(Client supabase, AppConfig config)
         await supabase.Rpc("delete_match", new { p_match_id = matchId });
     }
 
-    public FirstPlayerStats CalcFirstPlayerStats(List<Match> matches, int? playerId = null, int? deckId = null)
-    {
-        var filtered = matches.Where(m => m.FirstPlayerId.HasValue).ToList();
-
-        if (playerId.HasValue)
-            filtered = filtered.Where(m => m.FirstPlayerId == playerId).ToList();
-
-        if (deckId.HasValue)
-            filtered = filtered.Where(m => m.WinnerDeckId == deckId || m.LostDeckId == deckId).ToList();
-
-        int total = filtered.Count;
-        int firstWin = filtered.Count(m => m.FirstPlayerId == m.WinnerPlayerId);
-
-        return new FirstPlayerStats
-        {
-            TotalGames = total,
-            FirstPlayerWins = firstWin,
-            FirstPlayerWinRate = total == 0 ? 0 : Math.Round((double)firstWin / total * 100, 1)
-        };
-    }
+   
 }
 
 public class MatchResult

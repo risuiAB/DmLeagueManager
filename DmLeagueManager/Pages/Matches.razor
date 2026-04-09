@@ -471,18 +471,7 @@ else
         else
             editIndexDuplicate = false;
     }
-    
-    private void AddToEditWinnerSeasonDecks(Deck deck)
-    {
-        if (!editWinnerSeasonDecks.Any(d => d.Id == deck.Id))
-            editWinnerSeasonDecks.Add(deck);
-    }
 
-    private void AddToEditLoserSeasonDecks(Deck deck)
-    {
-        if (!editLoserSeasonDecks.Any(d => d.Id == deck.Id))
-            editLoserSeasonDecks.Add(deck);
-    }
 
     private async Task SubmitEdit()
     {
