@@ -84,40 +84,10 @@ public class TournamentService(Client supabase, AppConfig config)
             await Task.Delay(300);
             var t = MockData.Tournaments.FirstOrDefault(x => x.Id == tournamentId);
             if (t != null) t.Status = "finished";
-
-            // 順位未確定のプレイヤーに順位を付与
-            var unranked = standings
-                .Where(sp => sp.Rank == null)
-                .OrderByDescending(sp => sp.RemainingDecks)
-                .ThenByDescending(sp => sp.WinCount)
-                .ToList();
-
-            int rank = standings.Count(sp => sp.Rank != null) + 1;
-            foreach (var sp in unranked)
-            {
-                sp.Rank = rank++;
-                int rankPoints = sp.Rank switch { 1 => 3, 2 => 1, _ => 0 };
-                sp.TotalPoints = rankPoints + sp.DeckDiff;
-            }
             return;
         }
 
-        // 順位未確定のプレイヤーに順位を付与
-        var unrankedReal = standings
-            .Where(sp => sp.Rank == null)
-            .OrderByDescending(sp => sp.RemainingDecks)
-            .ThenByDescending(sp => sp.WinCount)
-            .ToList();
-
-        int currentRank = standings.Count(sp => sp.Rank != null) + 1;
-        foreach (var sp in unrankedReal)
-        {
-            sp.Rank = currentRank++;
-            int rankPoints = sp.Rank switch { 1 => 3, 2 => 1, _ => 0 };
-            sp.TotalPoints = rankPoints + sp.DeckDiff;
-            await supabase.From<SeasonPlayer>().Update(sp);
-        }
-
+        // statusをfinishedに変更
         var tournament = await supabase.From<Tournament>()
             .Where(t => t.Id == tournamentId).Single();
         if (tournament != null)
@@ -125,5 +95,8 @@ public class TournamentService(Client supabase, AppConfig config)
             tournament.Status = "finished";
             await supabase.From<Tournament>().Update(tournament);
         }
+
+        // recalculate_tournamentで勝ち点を再計算（rank_pointsを自動で参照）
+        await supabase.Rpc("recalculate_tournament", new { p_tournament_id = tournamentId });
     }
 }

@@ -30,7 +30,45 @@ else
             }
         </div>
     }
-
+    <!-- 大会順位表 -->
+    @if (standings.Any())
+    {
+        <div class="standings-card" style="margin-bottom:16px;">
+            <div class="standings-header">
+                <div class="standings-title">@selectedTournament?.Name 順位</div>
+                <div class="match-count">@matches.Count 試合</div>
+            </div>
+            @{
+                int rank = 1;
+            }
+            @foreach (var sp in standings)
+            {
+                string rankClass = rank switch { 1 => "rank-num gold", 2 => "rank-num silver", 3 => "rank-num bronze", _ => "rank-num" };
+                string rowClass = rank == 1 ? "player-row top1" : sp.IsEliminated ? "player-row eliminated" : "player-row";
+                <div class="@rowClass">
+                    <div class="@rankClass">@rank</div>
+                    <div class="player-info">
+                        <div class="player-name">@sp.Player?.Name</div>
+                        <div class="deck-pips">
+                            @for (int i = 0; i < sp.RemainingDecks; i++)
+                            {
+                                <div class="pip"></div>
+                            }
+                            @for (int i = sp.RemainingDecks; i < (selectedTournament?.DeckCount ?? 6); i++)
+                            {
+                                <div class="pip lost"></div>
+                            }
+                        </div>
+                    </div>
+                    <div class="player-stats">
+                        <span class="text-win">@sp.WinCount 勝</span> / <span class="text-lose">@sp.LoseCount 敗</span>
+                    </div>
+                    <div class="player-points">@sp.TotalPoints<span class="points-label">pt</span></div>
+                </div>
+                rank++;
+            }
+        </div>
+    }
     <!-- 先攻勝率サマリー -->
     @if (firstPlayerStats.TotalGames > 0)
     {
@@ -163,6 +201,7 @@ else
     private Dictionary<int, Player> playerMap = new();
     private Dictionary<int, Deck> deckMap = new();
     private FirstPlayerStats firstPlayerStats = new();
+    private List<SeasonPlayer> standings = new();
     private bool loading = true;
 
     protected override async Task OnInitializedAsync()
@@ -186,9 +225,9 @@ else
         selectedTournament = t;
         selectedTournamentId = t.Id;
         matches = await MatchService.GetTournamentMatchesAsync(t.Id);
+        standings = await PlayerService.GetTournamentStandingsAsync(t.Id); // ← 追加
 
         deckMap.Clear();
-        var standings = await PlayerService.GetTournamentStandingsAsync(t.Id);
         foreach (var sp in standings)
         {
             // player_idで全デッキ取得（既存デッキも含む）

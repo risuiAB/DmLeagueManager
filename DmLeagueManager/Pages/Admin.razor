@@ -14,11 +14,30 @@
     @if (activeSeason != null)
     {
         <div class="alert-info">進行中: <strong>@activeSeason.Name</strong></div>
+
+        <!-- 勝ち点設定編集 -->
+        <div style="margin-top:12px; margin-bottom:12px;">
+            <div class="form-label">🏆 順位ごとの勝ち点（カンマ区切り）</div>
+            <div style="display:flex; gap:8px;">
+                <input class="text-input" @bind="editRankPoints"
+                       style="flex:1; margin-bottom:0;" placeholder="3,1,0" />
+                <button class="btn-primary" @onclick="UpdateRankPoints" style="white-space:nowrap;">更新</button>
+            </div>
+            <div style="font-size:11px; color:var(--text-dim); margin-top:6px;">
+                現在: @string.Join(", ", activeSeason.RankPointsList.Select((p, i) => $"{i+1}位:{p}pt"))
+            </div>
+        </div>
+
         <button class="btn-danger" @onclick="FinishSeason">シーズンを終了する</button>
     }
     else
     {
         <input class="text-input" @bind="newSeasonName" placeholder="シーズン名（例: 2025年シーズン）" />
+        <div class="form-label" style="margin-top:8px;">🏆 順位ごとの勝ち点（カンマ区切り）</div>
+        <input class="text-input" @bind="newRankPoints" placeholder="3,1,0" />
+        <div style="font-size:11px; color:var(--text-dim); margin-bottom:8px;">
+            例: 3人なら「3,1,0」、4人なら「4,2,1,0」
+        </div>
         <button class="btn-primary" @onclick="CreateSeason"
                 disabled="@string.IsNullOrWhiteSpace(newSeasonName)">
             シーズンを作成
@@ -166,6 +185,8 @@
     private Dictionary<int, int> initialPointsMap = new();
 
     private string newSeasonName = "";
+    private string newRankPoints = "3,1,0";
+    private string editRankPoints = "3,1,0";
     private string newTournamentName = "";
     private int newTournamentDeckCount = 6;
     private string newPlayerName = "";
@@ -182,6 +203,7 @@
         allPlayers = await PlayerService.GetAllAsync();
         if (activeSeason != null)
         {
+            editRankPoints = string.Join(",", activeSeason.RankPointsList);
             var tournaments = await TournamentService.GetBySeasonAsync(activeSeason.Id);
             activeTournament = tournaments.FirstOrDefault(t => t.IsActive);
             pastTournaments = tournaments.Where(t => !t.IsActive).ToList();
@@ -194,9 +216,37 @@
         }
     }
 
+    private List<int> ParseRankPoints(string input)
+    {
+        return input.Split(',')
+            .Select(s => int.TryParse(s.Trim(), out var v) ? v : 0)
+            .ToList();
+    }
+
     private async Task CreateSeason()
     {
-        try { await SeasonService.CreateAsync(newSeasonName); message = $"シーズン「{newSeasonName}」を作成しました"; newSeasonName = ""; await LoadData(); }
+        try
+        {
+            var points = ParseRankPoints(newRankPoints);
+            await SeasonService.CreateAsync(newSeasonName, points);
+            message = $"シーズン「{newSeasonName}」を作成しました";
+            newSeasonName = "";
+            newRankPoints = "3,1,0";
+            await LoadData();
+        }
+        catch (Exception ex) { errorMessage = ex.Message; }
+    }
+
+    private async Task UpdateRankPoints()
+    {
+        try
+        {
+            var points = ParseRankPoints(editRankPoints);
+            var json = System.Text.Json.JsonSerializer.Serialize(points);
+            await SeasonService.UpdateRankPointsAsync(activeSeason!.Id, json);
+            message = "勝ち点設定を更新しました";
+            await LoadData();
+        }
         catch (Exception ex) { errorMessage = ex.Message; }
     }
 

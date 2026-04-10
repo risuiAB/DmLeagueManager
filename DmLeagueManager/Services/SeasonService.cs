@@ -33,8 +33,10 @@ public class SeasonService(Client supabase, AppConfig config)
         return result;
     }
 
-    public async Task<Season> CreateAsync(string name)
+    public async Task<Season> CreateAsync(string name, List<int>? rankPoints = null)
     {
+        var rankPointsJson = System.Text.Json.JsonSerializer.Serialize(rankPoints ?? new List<int> { 3, 1, 0 });
+
         if (config.UseMock)
         {
             await Task.Delay(300);
@@ -43,15 +45,34 @@ public class SeasonService(Client supabase, AppConfig config)
                 Id = MockData.Seasons.Max(s => s.Id) + 1,
                 Name = name,
                 Status = "active",
+                RankPoints = rankPointsJson,
                 CreatedAt = DateTime.Now
             };
             MockData.Seasons.Add(newSeason);
             return newSeason;
         }
 
-        var season = new Season { Name = name, Status = "active" };
+        var season = new Season { Name = name, Status = "active", RankPoints = rankPointsJson };
         var result = await supabase.From<Season>().Insert(season);
         return result.Model!;
+    }
+
+    public async Task UpdateRankPointsAsync(int seasonId, string rankPointsJson)
+    {
+        if (config.UseMock)
+        {
+            await Task.Delay(200);
+            var season = MockData.Seasons.FirstOrDefault(s => s.Id == seasonId);
+            if (season != null) season.RankPoints = rankPointsJson;
+            return;
+        }
+
+        var season2 = await supabase.From<Season>().Where(s => s.Id == seasonId).Single();
+        if (season2 != null)
+        {
+            season2.RankPoints = rankPointsJson;
+            await supabase.From<Season>().Update(season2);
+        }
     }
 
     public async Task FinishAsync(int seasonId)

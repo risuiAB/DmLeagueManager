@@ -2,6 +2,7 @@
 @inject SeasonService SeasonService
 @inject TournamentService TournamentService
 @inject PlayerService PlayerService
+@inject BannedCardService BannedCardService
 
 <PageTitle>管理 - DM League Manager</PageTitle>
 
@@ -71,6 +72,8 @@
                 @foreach (var p in allPlayers)
                 {
                     bool isJoined = joinedPlayerIds.Contains(p.Id);
+                    if (!initialPointsMap.ContainsKey(p.Id))
+                        initialPointsMap[p.Id] = 0;
                     <div style="display:flex; align-items:center; justify-content:space-between;
                                 background:var(--surface2); border:1px solid @(isJoined ? "rgba(39,174,96,0.4)" : "var(--border)");
                                 border-radius:8px; padding:12px 14px;">
@@ -87,10 +90,51 @@
                             <span style="font-size:12px; color:var(--win)">登録済み</span>
                         }
                     </div>
+                    @if (!isJoined)
+                    {
+                        <div style="display:flex; align-items:center; gap:8px;">
+                            <span style="font-size:11px; color:var(--text-dim); white-space:nowrap;">初期勝ち点:</span>
+                            <input type="number" class="text-input"
+                                   style="margin-bottom:0; padding:6px 10px; font-size:13px;"
+                                   value="@initialPointsMap[p.Id]"
+                                   @oninput="e => initialPointsMap[p.Id] = int.TryParse(e.Value?.ToString(), out var v) ? v : 0" />
+                        </div>
+                    }
                 }
             </div>
         </div>
     }
+
+    <!-- 禁止カード管理 -->
+    <div class="admin-card">
+        <div class="admin-card-title">🚫 禁止カード（@activeSeason.Name）</div>
+        @if (bannedCards.Any())
+        {
+            <div style="display:flex; flex-direction:column; gap:6px; margin-bottom:14px;">
+                @foreach (var card in bannedCards)
+                {
+                    <div style="display:flex; align-items:center; justify-content:space-between;
+                                background:rgba(192,57,43,0.08); border:1px solid rgba(192,57,43,0.3);
+                                border-radius:8px; padding:10px 14px;">
+                        <span style="font-size:13px; font-weight:700;">🚫 @card.CardName</span>
+                        <button @onclick="() => DeleteBannedCard(card.Id)"
+                                style="background:none; border:none; color:var(--text-dim); cursor:pointer; font-size:18px; padding:0 4px; line-height:1;">
+                            ×
+                        </button>
+                    </div>
+                }
+            </div>
+        }
+        else
+        {
+            <div style="font-size:12px; color:var(--text-dim); margin-bottom:14px;">禁止カードはありません</div>
+        }
+        <div style="display:flex; gap:8px;">
+            <input class="text-input" @bind="newCardName" placeholder="カード名を入力" style="flex:1; margin-bottom:0;" />
+            <button class="btn-primary" @onclick="AddBannedCard"
+                    disabled="@string.IsNullOrWhiteSpace(newCardName)">追加</button>
+        </div>
+    </div>
 }
 
 <!-- プレイヤー管理 -->
@@ -118,10 +162,14 @@
     private List<Tournament> pastTournaments = new();
     private List<Player> allPlayers = new();
     private List<int> joinedPlayerIds = new();
+    private List<BannedCard> bannedCards = new();
+    private Dictionary<int, int> initialPointsMap = new();
+
     private string newSeasonName = "";
     private string newTournamentName = "";
     private int newTournamentDeckCount = 6;
     private string newPlayerName = "";
+    private string newCardName = "";
     private string? message;
     private string? errorMessage;
 
@@ -142,6 +190,7 @@
                 var standings = await PlayerService.GetTournamentStandingsAsync(activeTournament.Id);
                 joinedPlayerIds = standings.Select(sp => sp.PlayerId).ToList();
             }
+            bannedCards = await BannedCardService.GetBySeasonAsync(activeSeason.Id);
         }
     }
 
@@ -171,13 +220,37 @@
 
     private async Task JoinTournament(int playerId)
     {
-        try { await PlayerService.JoinTournamentAsync(activeSeason!.Id, activeTournament!.Id, playerId, activeTournament.DeckCount); message = "参加登録しました"; await LoadData(); }
+        int initialPoints = initialPointsMap.GetValueOrDefault(playerId, 0);
+        try { await PlayerService.JoinTournamentAsync(activeSeason!.Id, activeTournament!.Id, playerId, activeTournament.DeckCount, initialPoints); message = "参加登録しました"; await LoadData(); }
         catch (Exception ex) { errorMessage = ex.Message; }
     }
 
     private async Task CreatePlayer()
     {
         try { await PlayerService.CreateAsync(newPlayerName); message = $"プレイヤー「{newPlayerName}」を追加しました"; newPlayerName = ""; allPlayers = await PlayerService.GetAllAsync(); }
+        catch (Exception ex) { errorMessage = ex.Message; }
+    }
+
+    private async Task AddBannedCard()
+    {
+        try
+        {
+            await BannedCardService.AddAsync(activeSeason!.Id, newCardName.Trim());
+            message = $"「{newCardName}」を禁止カードに追加しました";
+            newCardName = "";
+            bannedCards = await BannedCardService.GetBySeasonAsync(activeSeason.Id);
+        }
+        catch (Exception ex) { errorMessage = ex.Message; }
+    }
+
+    private async Task DeleteBannedCard(int id)
+    {
+        try
+        {
+            await BannedCardService.DeleteAsync(id);
+            message = "禁止カードを削除しました";
+            bannedCards = await BannedCardService.GetBySeasonAsync(activeSeason!.Id);
+        }
         catch (Exception ex) { errorMessage = ex.Message; }
     }
 }

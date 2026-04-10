@@ -12,13 +12,14 @@ public class MatchService(Client supabase, AppConfig config)
             await Task.Delay(150);
             return MockData.Matches
                 .Where(m => m.TournamentId == tournamentId)
-                .OrderByDescending(m => m.PlayedAt)
+                .OrderBy(m => m.MatchIndex ?? int.MaxValue)
+                .ThenByDescending(m => m.PlayedAt)
                 .ToList();
         }
 
         var result = await supabase.From<Match>()
             .Where(m => m.TournamentId == tournamentId)
-            .Order("played_at", Supabase.Postgrest.Constants.Ordering.Descending)
+            .Order("match_index", Supabase.Postgrest.Constants.Ordering.Ascending)
             .Get();
         return result.Models;
     }
@@ -41,6 +42,46 @@ public class MatchService(Client supabase, AppConfig config)
         return result.Models;
     }
 
+    /// <summary>次のmatch_indexを取得</summary>
+    public async Task<int> GetNextMatchIndexAsync(int tournamentId)
+    {
+        if (config.UseMock)
+        {
+            var existing = MockData.Matches.Where(m => m.TournamentId == tournamentId && m.MatchIndex.HasValue);
+            return existing.Any() ? existing.Max(m => m.MatchIndex!.Value) + 1 : 1;
+        }
+
+        var result = await supabase.From<Match>()
+            .Where(m => m.TournamentId == tournamentId)
+            .Get();
+
+        var maxIndex = result.Models
+            .Where(m => m.MatchIndex.HasValue)
+            .Select(m => m.MatchIndex!.Value)
+            .DefaultIfEmpty(0)
+            .Max();
+
+        return maxIndex + 1;
+    }
+
+    /// <summary>同じ大会内でmatch_indexが重複していないかチェック</summary>
+    public async Task<bool> IsMatchIndexDuplicateAsync(int tournamentId, int matchIndex, int? excludeMatchId = null)
+    {
+        if (config.UseMock)
+        {
+            return MockData.Matches.Any(m =>
+                m.TournamentId == tournamentId &&
+                m.MatchIndex == matchIndex &&
+                m.Id != (excludeMatchId ?? -1));
+        }
+
+        var result = await supabase.From<Match>()
+            .Where(m => m.TournamentId == tournamentId && m.MatchIndex == matchIndex)
+            .Get();
+
+        return result.Models.Any(m => m.Id != (excludeMatchId ?? -1));
+    }
+
     public async Task<MatchResult> RecordMatchAsync(
         int seasonId, int tournamentId,
         int winnerPlayerId, int loserPlayerId,
@@ -52,6 +93,9 @@ public class MatchService(Client supabase, AppConfig config)
         {
             await Task.Delay(400);
 
+            // 自動でmatch_indexを振る
+            var nextIndex = await GetNextMatchIndexAsync(tournamentId);
+
             var match = new Match
             {
                 Id = MockData.Matches.Count + 1,
@@ -62,6 +106,7 @@ public class MatchService(Client supabase, AppConfig config)
                 WinnerDeckId = winnerDeckId,
                 LostDeckId = lostDeckId,
                 FirstPlayerId = firstPlayerId,
+                MatchIndex = nextIndex,
                 Memo = memo,
                 PlayedAt = DateTime.Now
             };
@@ -100,7 +145,6 @@ public class MatchService(Client supabase, AppConfig config)
                     var remaining = MockData.SeasonPlayers
                         .Where(sp => sp.TournamentId == tournamentId && sp.Rank == null)
                         .ToList();
-
                     if (remaining.Count == 1)
                     {
                         var lastPlayer = remaining.First();
@@ -113,7 +157,9 @@ public class MatchService(Client supabase, AppConfig config)
             return new MatchResult { Match = match, LoserEliminated = eliminated, EliminatedRank = eliminatedRank };
         }
 
-        // 本番Supabase処理
+        // 自動でmatch_indexを振る
+        var nextIdx = await GetNextMatchIndexAsync(tournamentId);
+
         var matchReal = new Match
         {
             SeasonId = seasonId,
@@ -123,6 +169,7 @@ public class MatchService(Client supabase, AppConfig config)
             WinnerDeckId = winnerDeckId,
             LostDeckId = lostDeckId,
             FirstPlayerId = firstPlayerId,
+            MatchIndex = nextIdx,
             Memo = memo,
             PlayedAt = DateTime.UtcNow
         };
@@ -214,13 +261,11 @@ public class MatchService(Client supabase, AppConfig config)
     }
 
     public async Task UpdateMatchAsync(
-    int matchId,
-    int winnerPlayerId,
-    int loserPlayerId,
-    int winnerDeckId,
-    int lostDeckId,
-    int? firstPlayerId,
-    string? memo)
+        int matchId,
+        int winnerPlayerId, int loserPlayerId,
+        int winnerDeckId, int lostDeckId,
+        int? firstPlayerId, string? memo,
+        int? matchIndex = null)
     {
         if (config.UseMock)
         {
@@ -233,6 +278,7 @@ public class MatchService(Client supabase, AppConfig config)
             match.LostDeckId = lostDeckId;
             match.FirstPlayerId = firstPlayerId;
             match.Memo = memo;
+            if (matchIndex.HasValue) match.MatchIndex = matchIndex;
             return;
         }
 
@@ -246,6 +292,56 @@ public class MatchService(Client supabase, AppConfig config)
             p_first_player_id = firstPlayerId,
             p_memo = memo
         });
+
+        // match_indexを別途更新
+        if (matchIndex.HasValue)
+        {
+            var m = await supabase.From<Match>().Where(x => x.Id == matchId).Single();
+            if (m != null)
+            {
+                m.MatchIndex = matchIndex;
+                await supabase.From<Match>().Update(m);
+            }
+        }
+    }
+
+    public async Task DeleteMatchAsync(int matchId)
+    {
+        if (config.UseMock)
+        {
+            await Task.Delay(300);
+            var match = MockData.Matches.FirstOrDefault(m => m.Id == matchId);
+            if (match == null) return;
+
+            // 勝者の勝利数を戻す
+            var winnerSp = MockData.SeasonPlayers
+                .FirstOrDefault(sp => sp.TournamentId == match.TournamentId && sp.PlayerId == match.WinnerPlayerId);
+            if (winnerSp != null) winnerSp.WinCount--;
+
+            // 敗者の敗北数・残デッキ数を戻す
+            var loserSp = MockData.SeasonPlayers
+                .FirstOrDefault(sp => sp.TournamentId == match.TournamentId && sp.PlayerId == match.LoserPlayerId);
+            if (loserSp != null)
+            {
+                loserSp.LoseCount--;
+                loserSp.RemainingDecks++;
+            }
+
+            // 消滅デッキをactiveに戻す
+            var deck = MockData.Decks.FirstOrDefault(d => d.Id == match.LostDeckId);
+            if (deck != null) deck.Status = "active";
+
+            MockData.Matches.Remove(match);
+            return;
+        }
+
+        await supabase.Rpc("delete_match", new { p_match_id = matchId });
+    }
+
+    public async Task RecalculateTournamentAsync(int tournamentId)
+    {
+        if (config.UseMock) { await Task.Delay(300); return; }
+        await supabase.Rpc("recalculate_tournament", new { p_tournament_id = tournamentId });
     }
 }
 
