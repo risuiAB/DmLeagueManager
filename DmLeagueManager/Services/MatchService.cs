@@ -338,7 +338,11 @@ public class MatchService(Client supabase, AppConfig config)
         await supabase.Rpc("delete_match", new { p_match_id = matchId });
     }
 
-   
+    public async Task RecalculateTournamentAsync(int tournamentId)
+    {
+        if (config.UseMock) { await Task.Delay(300); return; }
+        await supabase.Rpc("recalculate_tournament", new { p_tournament_id = tournamentId });
+    }
 }
 
 public class MatchResult
