@@ -1,7 +1,7 @@
 {
   "mainAssemblyName": "DmLeagueManager",
   "resources": {
-    "hash": "sha256-hvDdtaDgJWvBdIXFKo0pj+Q5No3Pzce0J7A87IN7CPs=",
+    "hash": "sha256-W7bpFMptWo3K2JgHP3AV85Ctb3nX7Lu7xKxsm1WfQUc=",
     "fingerprinting": {
       "Microsoft.AspNetCore.Components.zdmvynwsft.wasm": "Microsoft.AspNetCore.Components.wasm",
       "Microsoft.AspNetCore.Components.Web.m6bakpaqcj.wasm": "Microsoft.AspNetCore.Components.Web.wasm",
@@ -54,7 +54,7 @@
       "System.IO.Compression.uo6rlgqv98.wasm": "System.IO.Compression.wasm",
       "System.IO.Pipelines.xlksj35j40.wasm": "System.IO.Pipelines.wasm",
       "System.Linq.Expressions.uq8hfxn44r.wasm": "System.Linq.Expressions.wasm",
-      "System.Linq.jt6ld6g49q.wasm": "System.Linq.wasm",
+      "System.Linq.sjpdyddkuv.wasm": "System.Linq.wasm",
       "System.Memory.u2ssuv2b28.wasm": "System.Memory.wasm",
       "System.Net.Http.6x5l0f5mlh.wasm": "System.Net.Http.wasm",
       "System.Net.NetworkInformation.uzoizmwshk.wasm": "System.Net.NetworkInformation.wasm",
@@ -74,7 +74,7 @@
       "System.Runtime.Numerics.xqz3ca6hpg.wasm": "System.Runtime.Numerics.wasm",
       "System.Runtime.Serialization.Formatters.3zc8j22ytb.wasm": "System.Runtime.Serialization.Formatters.wasm",
       "System.Runtime.Serialization.Primitives.aag2qj4xw1.wasm": "System.Runtime.Serialization.Primitives.wasm",
-      "System.Runtime.dp0hz1irih.wasm": "System.Runtime.wasm",
+      "System.Runtime.4a4u616txi.wasm": "System.Runtime.wasm",
       "System.Security.Claims.fv9p27yx3m.wasm": "System.Security.Claims.wasm",
       "System.Security.Cryptography.cgl5sdyuci.wasm": "System.Security.Cryptography.wasm",
       "System.Text.Encoding.Extensions.qunib489dc.wasm": "System.Text.Encoding.Extensions.wasm",
@@ -91,7 +91,7 @@
       "System.dqfxtvioy0.wasm": "System.wasm",
       "netstandard.1o1tcnv2kb.wasm": "netstandard.wasm",
       "System.Private.CoreLib.uxlsvv446f.wasm": "System.Private.CoreLib.wasm",
-      "DmLeagueManager.9j8hcxqirr.wasm": "DmLeagueManager.wasm",
+      "DmLeagueManager.6w4n7zzqpu.wasm": "DmLeagueManager.wasm",
       "dotnet.js": "dotnet.js",
       "dotnet.native.l1ds2rhypd.js": "dotnet.native.js",
       "dotnet.native.etgrtk5jba.wasm": "dotnet.native.wasm",
@@ -170,7 +170,7 @@
       "System.IO.Compression.uo6rlgqv98.wasm": "sha256-ni8iEGB39x1eUOOuPXzPnKhiDa5vO/OVUjZpCo0NnWs=",
       "System.IO.Pipelines.xlksj35j40.wasm": "sha256-q7mGEcpph+nlGWd4rmBSfmXRrRasjniRTy3iBAsX3So=",
       "System.Linq.Expressions.uq8hfxn44r.wasm": "sha256-hkl/IHHE8d0/YJkxX2Spe1CegMQfqhJm5nrSeFN3yfQ=",
-      "System.Linq.jt6ld6g49q.wasm": "sha256-OeVY4xhV1R6gHTPRu0DVv+XJ+dy9YCoCwGDrxIqAtJE=",
+      "System.Linq.sjpdyddkuv.wasm": "sha256-mEjW22LMNrhYKD8ioCQEDTP2fs7ookMPs2nj1tFq6VQ=",
       "System.Memory.u2ssuv2b28.wasm": "sha256-JhcMx7N+p2l7BfMsAbqbRZujkU3nkFYi7rJcJSFSRUc=",
       "System.Net.Http.6x5l0f5mlh.wasm": "sha256-On3chUSqo/N97VcqQnczmd0mKLl6Bvxqcg125fpyCKo=",
       "System.Net.NetworkInformation.uzoizmwshk.wasm": "sha256-CmqqEdh3e60yV/9N9czJUBnYhvHnP8BUn7HlhpY6De4=",
@@ -189,7 +189,7 @@
       "System.Runtime.Numerics.xqz3ca6hpg.wasm": "sha256-uWtGxxvjtxZCZlI5hmJYHaMqZngRvGqZIUf5RIDySXw=",
       "System.Runtime.Serialization.Formatters.3zc8j22ytb.wasm": "sha256-UTFCMYP/hm2uZeTO5h0clH/w8BkO+KGR+xj63bE5xJI=",
       "System.Runtime.Serialization.Primitives.aag2qj4xw1.wasm": "sha256-DjuDZcvmH+z5TkuFfpPKwE9BonBAOef/UrHiEWy9VK0=",
-      "System.Runtime.dp0hz1irih.wasm": "sha256-0aQNmPvRFcMjQ/49l9yw3snRqFrOBHNUFtO9lSTxFRo=",
+      "System.Runtime.4a4u616txi.wasm": "sha256-LHsKgWi7KZEWA0DhO4SY+VuxQ7A0uu0BtM7dQoe4WTo=",
       "System.Security.Claims.fv9p27yx3m.wasm": "sha256-OxzRuk/dmNo8jn5YwyPFYj46n9YLLHStETrPh6nxBVw=",
       "System.Security.Cryptography.cgl5sdyuci.wasm": "sha256-JHSEZvf1OCymxrTFHOEv2wA+T3oCEwTaD6L9zYRyR58=",
       "System.Text.Encoding.Extensions.qunib489dc.wasm": "sha256-vnvo4BM3ESzxiUM1/kawI9kYGbkur3HSdUtmy+AXJy4=",
@@ -205,7 +205,7 @@
       "System.Xml.XDocument.75levxgv6x.wasm": "sha256-i8U4glWpuGMEh+O3BBgRUOr/HIGK3otm6Vb3FozG/1w=",
       "System.dqfxtvioy0.wasm": "sha256-5QZAjy4n7513fYxCXSXTsAkUmRsLiZ8m621Ot4k7FB0=",
       "netstandard.1o1tcnv2kb.wasm": "sha256-sWUcQlHKuUd9Y/r4TSXTVaCY2lojZFMqBnSXR1w6WnA=",
-      "DmLeagueManager.9j8hcxqirr.wasm": "sha256-dRWOm7r/cj1re2U6btaBwfq9wHd8ec/PS7ggnaxiMSU="
+      "DmLeagueManager.6w4n7zzqpu.wasm": "sha256-egTFD8VcHyXOygS4Ff4wSPM1mmO3QgFK/npq8MEeH8M="
     }
   },
   "cacheBootResources": true,
