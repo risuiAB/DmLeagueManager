@@ -41,15 +41,6 @@ public class TournamentService(Client supabase, AppConfig config)
         if (config.UseMock)
         {
             await Task.Delay(300);
-
-            // モック: 前の大会の全デッキをactiveに戻す
-            var prevSpIds = MockData.SeasonPlayers
-                .Where(sp => sp.SeasonId == seasonId)
-                .Select(sp => sp.Id)
-                .ToHashSet();
-            foreach (var deck in MockData.Decks.Where(d => prevSpIds.Contains(d.SeasonPlayerId)))
-                deck.Status = "active";
-
             var t = new Tournament
             {
                 Id = MockData.Tournaments.Any() ? MockData.Tournaments.Max(x => x.Id) + 1 : 1,
@@ -62,9 +53,6 @@ public class TournamentService(Client supabase, AppConfig config)
             MockData.Tournaments.Add(t);
             return t;
         }
-
-        // RPC で1回のAPIコールで全デッキをactiveに戻す
-        await supabase.Rpc("reset_decks_for_season", new { p_season_id = seasonId });
 
         var tournament = new Tournament
         {
@@ -98,5 +86,9 @@ public class TournamentService(Client supabase, AppConfig config)
 
         // recalculate_tournamentで勝ち点を再計算（rank_pointsを自動で参照）
         await supabase.Rpc("recalculate_tournament", new { p_tournament_id = tournamentId });
+
+        // 全デッキをactiveに戻す
+        await supabase.Rpc("reset_decks_for_season", new { p_season_id = tournament!.SeasonId });
+
     }
 }

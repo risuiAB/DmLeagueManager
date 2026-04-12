@@ -119,7 +119,7 @@ else
 }
 
 <!-- 試合入力FAB -->
-@if (activeTournament != null && activeTournament.IsActive && standings.Count(x=>!x.IsEliminated) > 1)
+@if (activeTournament != null && activeTournament.IsActive && standings.Count(x => !x.IsEliminated) > 1)
 {
     <button class="fab" @onclick="OpenModal">⚔️ 試合結果を入力</button>
 }
@@ -146,11 +146,10 @@ else
             @if (selectedWinnerId > 0)
             {
                 <div class="form-label">🃏 勝者のデッキ</div>
-                <DeckSelector SeasonDecks="@winnerSeasonDecks" AllDecks="@winnerAllDecks"
+                <DeckSelector TournamentDecks="@winnerTournamentDecks" AllDecks="@winnerAllDecks"
                     SelectedDeckId="@selectedWinnerDeckId"
-                    ShowAll = "false"
                     OnDeckSelected="SetWinnerDeckId" OnNewDeckName="SetWinnerNewDeckName"
-                    OnDeckAddedToSeason="AddToWinnerSeasonDecks" />
+                    OnDeckAddedToTournament="AddToWinnerTournamentDecks" />
             }
 
             <div class="form-label" style="margin-top:16px">💀 敗者</div>
@@ -165,12 +164,12 @@ else
             @if (selectedLoserId > 0)
             {
                 <div class="form-label">💀 敗者のデッキ（消滅します）</div>
-                <DeckSelector SeasonDecks="@loserSeasonDecks" AllDecks="@loserAllDecks"
+                <DeckSelector TournamentDecks="@loserTournamentDecks" AllDecks="@loserAllDecks"
                     SelectedDeckId="@selectedLostDeckId"
-                    ShowAll="false"
                     OnDeckSelected="SetLostDeckId" OnNewDeckName="SetLoserNewDeckName"
-                    OnDeckAddedToSeason="AddToLoserSeasonDecks" />
+                    OnDeckAddedToTournament="AddToLoserTournamentDecks" />
             }
+
             <div class="form-label" style="margin-top:16px">⚡ 先攻</div>
             <div style="background:var(--surface2); border:1px solid var(--border); border-radius:8px;
                 padding:12px 14px; display:flex; align-items:center; gap:10px; margin-bottom:16px;">
@@ -217,16 +216,16 @@ else
     private int selectedLoserSeasonPlayerId = 0;
     private int selectedWinnerDeckId = 0;
     private string winnerNewDeckName = "";
-    private List<Deck> winnerSeasonDecks = new();
+    private List<(Deck Deck, TournamentDeck TournamentDeck)> winnerTournamentDecks = new();
     private List<Deck> winnerAllDecks = new();
     private int selectedLostDeckId = 0;
     private string loserNewDeckName = "";
-    private List<Deck> loserSeasonDecks = new();
+    private List<(Deck Deck, TournamentDeck TournamentDeck)> loserTournamentDecks = new();
     private List<Deck> loserAllDecks = new();
     private string? errorMessage;
     private bool submitting = false;
     private string matchMemo = "";
-    private bool winnerIsFirst = true; // デフォルトは勝者が先攻
+    private bool winnerIsFirst = true;
 
     protected override async Task OnInitializedAsync() => await LoadData();
 
@@ -260,8 +259,8 @@ else
         selectedLoserId = 0; selectedLoserSeasonPlayerId = 0;
         selectedWinnerDeckId = 0; winnerNewDeckName = "";
         selectedLostDeckId = 0; loserNewDeckName = "";
-        winnerSeasonDecks.Clear(); winnerAllDecks.Clear();
-        loserSeasonDecks.Clear(); loserAllDecks.Clear();
+        winnerTournamentDecks.Clear(); winnerAllDecks.Clear();
+        loserTournamentDecks.Clear(); loserAllDecks.Clear();
         matchMemo = "";
         winnerIsFirst = true;
         errorMessage = null;
@@ -273,7 +272,7 @@ else
     {
         selectedWinnerId = sp.PlayerId; selectedWinnerSeasonPlayerId = sp.Id;
         selectedWinnerDeckId = 0; winnerNewDeckName = "";
-        winnerSeasonDecks = await DeckService.GetBySeasonPlayerAsync(sp.Id);
+        winnerTournamentDecks = await DeckService.GetTournamentDecksAsync(sp.Id);
         winnerAllDecks = await DeckService.GetAllByPlayerAsync(sp.PlayerId);
     }
 
@@ -281,7 +280,7 @@ else
     {
         selectedLoserId = sp.PlayerId; selectedLoserSeasonPlayerId = sp.Id;
         selectedLostDeckId = 0; loserNewDeckName = "";
-        loserSeasonDecks = await DeckService.GetBySeasonPlayerAsync(sp.Id);
+        loserTournamentDecks = await DeckService.GetTournamentDecksAsync(sp.Id);
         loserAllDecks = await DeckService.GetAllByPlayerAsync(sp.PlayerId);
     }
 
@@ -290,16 +289,22 @@ else
     private void SetLostDeckId(int id) => selectedLostDeckId = id;
     private void SetLoserNewDeckName(string name) => loserNewDeckName = name;
 
-    private void AddToWinnerSeasonDecks(Deck deck)
+    private async Task AddToWinnerTournamentDecks(Deck deck)
     {
-        if (!winnerSeasonDecks.Any(d => d.Id == deck.Id))
-        winnerSeasonDecks.Add(deck);
+        if (!winnerTournamentDecks.Any(x => x.Deck.Id == deck.Id))
+        {
+            var td = await DeckService.AddDeckToTournamentAsync(selectedWinnerSeasonPlayerId, deck.Id);
+            winnerTournamentDecks.Add((deck, td));
+        }
     }
 
-    private void AddToLoserSeasonDecks(Deck deck)
+    private async Task AddToLoserTournamentDecks(Deck deck)
     {
-        if (!loserSeasonDecks.Any(d => d.Id == deck.Id))
-            loserSeasonDecks.Add(deck);
+        if (!loserTournamentDecks.Any(x => x.Deck.Id == deck.Id))
+        {
+            var td = await DeckService.AddDeckToTournamentAsync(selectedLoserSeasonPlayerId, deck.Id);
+            loserTournamentDecks.Add((deck, td));
+        }
     }
 
     private async Task SubmitMatch()
@@ -316,28 +321,37 @@ else
             int winnerDeckId = selectedWinnerDeckId;
             if (winnerDeckId == 0)
             {
-                var deck = await DeckService.RegisterDeckAsync(selectedWinnerSeasonPlayerId, selectedWinnerId, winnerNewDeckName);
+                var (deck, _) = await DeckService.CreateAndAddDeckAsync(
+                    selectedWinnerId, selectedWinnerSeasonPlayerId, winnerNewDeckName.Trim());
                 winnerDeckId = deck.Id;
             }
+            else
+            {
+                // 全履歴から選択した場合、今大会に登録
+                await DeckService.AddDeckToTournamentAsync(selectedWinnerSeasonPlayerId, winnerDeckId);
+            }
+
             int lostDeckId = selectedLostDeckId;
             if (lostDeckId == 0)
             {
-                var lostDecks = await DeckService.GetBySeasonPlayerAsync(selectedLoserSeasonPlayerId);
-                var duplicate = lostDecks.FirstOrDefault(d =>
-                    !d.IsActive && d.Name == loserNewDeckName.Trim());
-
-                if (duplicate != null)
+                // 重複チェック
+                bool isDuplicate = await DeckService.IsDeckNameDuplicateAsync(selectedLoserId, loserNewDeckName.Trim());
+                if (isDuplicate)
                 {
-                    errorMessage = $"「{loserNewDeckName}」はすでに消滅したデッキです";
+                    errorMessage = $"「{loserNewDeckName}」はすでに存在するデッキ名です";
                     submitting = false;
                     return;
                 }
-
-                var deck = await DeckService.RegisterDeckAsync(selectedLoserSeasonPlayerId, selectedLoserId, loserNewDeckName);
+                var (deck, _) = await DeckService.CreateAndAddDeckAsync(
+                    selectedLoserId, selectedLoserSeasonPlayerId, loserNewDeckName.Trim());
                 lostDeckId = deck.Id;
             }
+            else
+            {
+                // 全履歴から選択した場合、今大会に登録
+                await DeckService.AddDeckToTournamentAsync(selectedLoserSeasonPlayerId, lostDeckId);
+            }
 
-            // 先攻プレイヤーID = 勝者が先攻ならwinnerPlayerId、そうでなければloserPlayerId
             int firstPlayerId = winnerIsFirst ? selectedWinnerId : selectedLoserId;
 
             await MatchService.RecordMatchAsync(

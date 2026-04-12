@@ -114,8 +114,7 @@
                 var standings = await PlayerService.GetTournamentStandingsAsync(t.Id);
                 foreach (var sp in standings)
                 {
-                    var decks = await DeckService.GetBySeasonPlayerAsync(sp.Id);
-                    allDecks.AddRange(decks);
+                    
                 }
             }
             var duplicates = allDecks.GroupBy(d => d.Id).Where(g => g.Count() > 1).ToList();

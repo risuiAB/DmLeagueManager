@@ -1,32 +1,40 @@
 @* デッキ選択コンポーネント
-   今シーズン使用済み / プレイヤー全履歴 / 新規入力 を切り替えて選択できる *@
+   今大会使用済み / プレイヤー全履歴 / 新規入力 を切り替えて選択できる *@
 
 <div class="deck-selector">
 
     <!-- タブ切り替え -->
     <div class="deck-selector-tabs">
-        <button class="deck-tab @(mode == "season" ? "active" : "")" @onclick="SetModeSeason">今シーズン</button>
-        <button class="deck-tab @(mode == "all" ? "active" : "")" @onclick="SetModeAll">全履歴</button>
-        <button class="deck-tab @(mode == "new" ? "active" : "")" @onclick="SetModeNew">新規入力</button>
+        <button class="deck-tab @(mode == "season" ? "active" : "")" @onclick='() => mode = "season"'>
+            今大会
+        </button>
+        <button class="deck-tab @(mode == "all" ? "active" : "")" @onclick='() => mode = "all"'>
+            全履歴
+        </button>
+        <button class="deck-tab @(mode == "new" ? "active" : "")" @onclick='() => mode = "new"'>
+            新規入力
+        </button>
     </div>
-    <!-- 今シーズンのデッキ一覧 -->
+
+    <!-- 今大会のデッキ一覧 -->
     @if (mode == "season")
     {
-        @if (!SeasonDecks.Any())
+        @if (!TournamentDecks.Any())
         {
-            <div class="deck-empty">今シーズンはまだデッキがありません</div>
+            <div class="deck-empty">今大会はまだデッキがありません</div>
         }
         else
         {
             <div class="deck-list">
-                @foreach (var deck in ShowAll ? SeasonDecks : SeasonDecks.Where(d => d.IsActive))
+                @foreach (var (deck, td) in TournamentDecks)
                 {
+                    bool selectable = td.IsActive || ShowAll;
                     <div class="deck-select-item @(SelectedDeckId == deck.Id ? "selected" : "")"
-                         style="@(!deck.IsActive && !ShowAll ? "opacity:0.5; cursor:not-allowed;" : "")"
-                         @onclick="() => { if (deck.IsActive || ShowAll) SelectDeck(deck.Id); }">
+                         style="@(!selectable ? "opacity:0.5; cursor:not-allowed;" : "")"
+                         @onclick="() => { if(selectable) SelectDeck(deck.Id); }">
                         <span>@deck.Name</span>
-                        <span style="font-size:11px; color:@(deck.IsActive ? "var(--win)" : "var(--lose)")">
-                            @(deck.IsActive ? "使用可" : "消滅済")
+                        <span style="font-size:11px; color:@(td.IsActive ? "var(--win)" : "var(--lose)")">
+                            @(td.IsActive ? "使用可" : "消滅済")
                         </span>
                     </div>
                 }
@@ -37,19 +45,31 @@
     <!-- 全履歴デッキ一覧 -->
     @if (mode == "all")
     {
-        <div class="deck-list">
-            @foreach (var deck in ShowAll ? AllDecks : AllDecks.Where(d => d.IsActive))
-            {
-                <div class="deck-select-item @(SelectedDeckId == deck.Id ? "selected" : "")"
-                     style="@(!deck.IsActive && !ShowAll ? "opacity:0.5; cursor:not-allowed;" : "")"
-                     @onclick="() => { if (deck.IsActive || ShowAll) SelectDeckFromHistory(deck); }">
-                    <span>@deck.Name</span>
-                    <span style="font-size:11px; color:@(deck.IsActive ? "var(--win)" : "var(--lose)")">
-                        @(deck.IsActive ? "使用可" : "消滅済")
-                    </span>
-                </div>
-            }
-        </div>
+        @if (!AllDecks.Any())
+        {
+            <div class="deck-empty">デッキ履歴がありません</div>
+        }
+        else
+        {
+            <div class="deck-list">
+                @foreach (var deck in AllDecks)
+                {
+                    // 今大会で消滅済みのデッキは選択不可
+                    var td = TournamentDecks.FirstOrDefault(x => x.Deck.Id == deck.Id).TournamentDeck;
+                    bool isLostInTournament = td != null && !td.IsActive;
+                    bool selectable = !isLostInTournament || ShowAll;
+                    <div class="deck-select-item @(SelectedDeckId == deck.Id ? "selected" : "")"
+                         style="@(!selectable ? "opacity:0.5; cursor:not-allowed;" : "")"
+                         @onclick="() => { if(selectable) SelectDeckFromHistory(deck); }">
+                        <span>@deck.Name</span>
+                        @if (isLostInTournament)
+                        {
+                            <span style="font-size:11px; color:var(--lose)">消滅済</span>
+                        }
+                    </div>
+                }
+            </div>
+        }
     }
 
     <!-- 新規入力 -->
@@ -65,12 +85,12 @@
 </div>
 
 @code {
-    [Parameter] public List<Deck> SeasonDecks { get; set; } = new();
+    [Parameter] public List<(Deck Deck, TournamentDeck TournamentDeck)> TournamentDecks { get; set; } = new();
     [Parameter] public List<Deck> AllDecks { get; set; } = new();
     [Parameter] public int SelectedDeckId { get; set; }
     [Parameter] public EventCallback<int> OnDeckSelected { get; set; }
     [Parameter] public EventCallback<string> OnNewDeckName { get; set; }
-    [Parameter] public EventCallback<Deck> OnDeckAddedToSeason { get; set; }
+    [Parameter] public EventCallback<Deck> OnDeckAddedToTournament { get; set; }
     [Parameter] public bool ShowAll { get; set; } = false;
 
     private string mode = "season";
@@ -82,21 +102,18 @@
         await OnNewDeckName.InvokeAsync("");
     }
 
+    private async Task SelectDeckFromHistory(Deck deck)
+    {
+        await OnDeckSelected.InvokeAsync(deck.Id);
+        await OnNewDeckName.InvokeAsync("");
+        await OnDeckAddedToTournament.InvokeAsync(deck);
+        mode = "season";
+    }
+
     private async Task OnNewNameInput(ChangeEventArgs e)
     {
         newName = e.Value?.ToString() ?? "";
         await OnDeckSelected.InvokeAsync(0);
         await OnNewDeckName.InvokeAsync(newName);
     }
-
-    private async Task SelectDeckFromHistory(Deck deck)
-    {
-        await SelectDeck(deck.Id);
-        // 今シーズンタブにも追加して切り替える
-        await OnDeckAddedToSeason.InvokeAsync(deck);
-        mode = "season";
-    }
-    private void SetModeSeason() => mode = "season";
-    private void SetModeAll() => mode = "all";
-    private void SetModeNew() => mode = "new";
 }
