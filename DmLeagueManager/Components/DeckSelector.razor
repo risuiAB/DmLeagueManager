@@ -106,8 +106,8 @@
     {
         await OnDeckSelected.InvokeAsync(deck.Id);
         await OnNewDeckName.InvokeAsync("");
-        await OnDeckAddedToTournament.InvokeAsync(deck);
-        mode = "season";
+        // await OnDeckAddedToTournament.InvokeAsync(deck);
+        // mode = "season";
     }
 
     private async Task OnNewNameInput(ChangeEventArgs e)
