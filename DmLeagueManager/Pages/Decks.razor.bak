@@ -35,22 +35,16 @@ else
     <div style="margin-bottom:16px;">
         <div class="form-label">期間フィルター</div>
         <div style="display:flex; flex-direction:column; gap:6px;">
-
-            <!-- 全期間 -->
             <button class="filter-btn @(selectedFilter == "all" ? "active" : "")"
                     @onclick='() => ApplyFilter("all", 0, 0)'>
                 📊 全期間
             </button>
-
-            <!-- シーズンごと -->
             @foreach (var season in allSeasons)
             {
                 <button class="filter-btn @(selectedFilter == $"season_{season.Id}" ? "active" : "")"
                         @onclick="@(() => ApplyFilter($"season_{season.Id}", season.Id, 0))">
                     📅 @season.Name
                 </button>
-
-                <!-- 大会ごと（シーズン配下） -->
                 @foreach (var t in tournamentMap.GetValueOrDefault(season.Id, new()))
                 {
                     <button class="filter-btn sub @(selectedFilter == $"tournament_{t.Id}" ? "active" : "")"
@@ -74,19 +68,17 @@ else
         else
         {
             <div style="display:flex; flex-direction:column; gap:8px; margin-bottom:100px;">
-                @foreach (var deck in filteredDecks)
+                @foreach (var (deck, isActive) in filteredDecks)
                 {
                     bool isExpanded = expandedDeckId == deck.Id;
                     var stats = deckStatsMap.GetValueOrDefault(deck.Id);
 
-                    <div style="background:var(--surface); border:1px solid @(deck.IsActive ? "rgba(46,204,113,0.3)" : "var(--border)"); border-radius:10px; overflow:hidden;">
-
-                        <!-- ヘッダー -->
+                    <div style="background:var(--surface); border:1px solid @(isActive ? "rgba(46,204,113,0.3)" : "var(--border)"); border-radius:10px; overflow:hidden;">
                         <div style="padding:12px 14px; display:flex; align-items:center; gap:12px; cursor:pointer;"
                              @onclick="() => ToggleDeck(deck.Id)">
-                            <div style="font-size:18px;">@(deck.IsActive ? "🟢" : "💀")</div>
+                            <div style="font-size:18px;">@(isActive ? "🟢" : "💀")</div>
                             <div style="flex:1;">
-                                <div style="font-weight:700; font-size:14px; color:@(deck.IsActive ? "var(--text)" : "var(--text-dim)")">
+                                <div style="font-weight:700; font-size:14px; color:@(isActive ? "var(--text)" : "var(--text-dim)")">
                                     @deck.Name
                                 </div>
                                 @if (stats != null)
@@ -117,7 +109,6 @@ else
                             <div style="color:var(--text-dim); font-size:12px;">@(isExpanded ? "▲" : "▼")</div>
                         </div>
 
-                        <!-- 展開詳細 -->
                         @if (isExpanded && stats != null)
                         {
                             <div style="border-top:1px solid var(--border); padding:12px 14px; background:var(--surface2);">
@@ -133,7 +124,7 @@ else
                                                 <span style="color:var(--text-dim)">@r.OpponentPlayerName</span>
                                                 <span style="color:var(--text); margin-left:4px; font-weight:700;">@r.OpponentDeckName</span>
                                             </div>
-                                            <div style="font-size:10px; color:var(--text-dim);">@r.PlayedAt.ToLocalTime().ToString("MM/dd")</div>
+                                            <div style="font-size:10px; color:var(--text-dim);">@r.PlayedAt.AddHours(9).ToString("MM/dd")</div>
                                         </div>
                                     }
                                 }
@@ -149,7 +140,7 @@ else
                                                 <span style="color:var(--text-dim)">@r.OpponentPlayerName</span>
                                                 <span style="color:var(--text); margin-left:4px; font-weight:700;">@r.OpponentDeckName</span>
                                             </div>
-                                            <div style="font-size:10px; color:var(--text-dim);">@r.PlayedAt.ToLocalTime().ToString("MM/dd")</div>
+                                            <div style="font-size:10px; color:var(--text-dim);">@r.PlayedAt.AddHours(9).ToString("MM/dd")</div>
                                         </div>
                                     }
                                 }
@@ -173,11 +164,11 @@ else
     private List<Season> allSeasons = new();
     private Dictionary<int, List<Tournament>> tournamentMap = new();
 
-    // 全試合・全デッキのキャッシュ
+    // キャッシュ
     private Dictionary<int, List<Match>> matchesByTournament = new();
     private Dictionary<int, List<Match>> matchesBySeason = new();
-    private Dictionary<int, List<Deck>> decksBySeasonPlayer = new();
-    private Dictionary<int, SeasonPlayer> seasonPlayerByPlayerAndTournament = new();
+    // playerId → (Deck, isActive) のリスト（大会ごとのステータスを保持）
+    private Dictionary<int, List<(Deck Deck, int TournamentId, bool IsActive)>> decksByPlayer = new();
     private Dictionary<int, Deck> globalDeckMap = new();
     private Dictionary<int, Player> playerMap = new();
 
@@ -188,7 +179,7 @@ else
     private int selectedTournamentId = 0;
 
     // 表示用
-    private List<Deck> filteredDecks = new();
+    private List<(Deck Deck, bool IsActive)> filteredDecks = new();
     private Dictionary<int, DeckStats> deckStatsMap = new();
     private int expandedDeckId = 0;
     private bool loading = true;
@@ -214,10 +205,18 @@ else
                 var standings = await PlayerService.GetTournamentStandingsAsync(t.Id);
                 foreach (var sp in standings)
                 {
-                    seasonPlayerByPlayerAndTournament[sp.PlayerId * 10000 + t.Id] = sp;
-                    var decks = await DeckService.GetAllByPlayerAsync(sp.PlayerId);
-                    decksBySeasonPlayer[sp.Id] = decks;
-                    foreach (var d in decks) globalDeckMap[d.Id] = d;
+                    // tournament_decksからデッキとステータスを取得
+                    var tdPairs = await DeckService.GetTournamentDecksAsync(sp.Id);
+                    foreach (var (deck, td) in tdPairs)
+                    {
+                        globalDeckMap[deck.Id] = deck;
+                        if (!decksByPlayer.ContainsKey(sp.PlayerId))
+                            decksByPlayer[sp.PlayerId] = new();
+
+                        // 既存エントリがなければ追加
+                        if (!decksByPlayer[sp.PlayerId].Any(x => x.Deck.Id == deck.Id && x.TournamentId == t.Id))
+                            decksByPlayer[sp.PlayerId].Add((deck, t.Id, td.IsActive));
+                    }
                 }
             }
             matchesBySeason[season.Id] = seasonMatches;
@@ -252,54 +251,52 @@ else
         // 対象試合を絞り込む
         List<Match> targetMatches;
         if (selectedFilter == "all")
-        {
             targetMatches = matchesByTournament.Values.SelectMany(x => x).ToList();
-        }
         else if (selectedFilter.StartsWith("season_"))
-        {
             targetMatches = matchesBySeason.GetValueOrDefault(selectedSeasonId, new());
-        }
-        else // tournament_
-        {
+        else
             targetMatches = matchesByTournament.GetValueOrDefault(selectedTournamentId, new());
-        }
 
-        // 対象デッキを絞り込む（プレイヤー×期間）
-        var playerSeasonPlayers = seasonPlayerByPlayerAndTournament.Values
-            .Where(sp => sp.PlayerId == selectedPlayerId)
-            .ToList();
+        // デッキを絞り込む
+        var playerDecks = decksByPlayer.GetValueOrDefault(selectedPlayerId, new());
 
-        // 期間フィルターに応じてSeasonPlayerを絞る
-        if (selectedFilter.StartsWith("tournament_"))
+        List<(Deck Deck, bool IsActive)> deckList;
+
+        if (selectedFilter == "all")
         {
-            playerSeasonPlayers = playerSeasonPlayers
-                .Where(sp => seasonPlayerByPlayerAndTournament.ContainsKey(sp.PlayerId * 10000 + selectedTournamentId))
+            // 全期間: デッキIDで重複除去、最新のステータスを使用
+            deckList = playerDecks
+                .GroupBy(x => x.Deck.Id)
+                .Select(g => (g.First().Deck, g.OrderByDescending(x => x.TournamentId).First().IsActive))
                 .ToList();
-            var sp = seasonPlayerByPlayerAndTournament.GetValueOrDefault(selectedPlayerId * 10000 + selectedTournamentId);
-            playerSeasonPlayers = sp != null ? new List<SeasonPlayer> { sp } : new();
         }
         else if (selectedFilter.StartsWith("season_"))
         {
             var seasonTournamentIds = tournamentMap.GetValueOrDefault(selectedSeasonId, new())
                 .Select(t => t.Id).ToHashSet();
-            playerSeasonPlayers = playerSeasonPlayers
-                .Where(sp => seasonTournamentIds.Any(tid =>
-                    seasonPlayerByPlayerAndTournament.ContainsKey(selectedPlayerId * 10000 + tid) &&
-                    seasonPlayerByPlayerAndTournament[selectedPlayerId * 10000 + tid].Id == sp.Id))
+            deckList = playerDecks
+                .Where(x => seasonTournamentIds.Contains(x.TournamentId))
+                .GroupBy(x => x.Deck.Id)
+                .Select(g => (g.First().Deck, g.OrderByDescending(x => x.TournamentId).First().IsActive))
+                .ToList();
+        }
+        else
+        {
+            deckList = playerDecks
+                .Where(x => x.TournamentId == selectedTournamentId)
+                .GroupBy(x => x.Deck.Id)
+                .Select(g => (g.First().Deck, g.First().IsActive))
                 .ToList();
         }
 
-        // デッキ収集
-        filteredDecks = playerSeasonPlayers
-            .SelectMany(sp => decksBySeasonPlayer.GetValueOrDefault(sp.Id, new()))
-            .DistinctBy(d => d.Id)
-            .OrderBy(d => d.IsActive ? 0 : 1)
-            .ThenBy(d => d.Name)
+        filteredDecks = deckList
+            .OrderBy(x => x.IsActive ? 0 : 1)
+            .ThenBy(x => x.Deck.Name)
             .ToList();
 
         // 統計計算
         deckStatsMap.Clear();
-        foreach (var deck in filteredDecks)
+        foreach (var (deck, _) in filteredDecks)
         {
             deckStatsMap[deck.Id] = await DeckStatsService.GetDeckStatsAsync(
                 deck.Id, targetMatches, globalDeckMap, playerMap);

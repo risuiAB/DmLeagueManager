@@ -59,102 +59,109 @@ else
     <!-- デッキ一覧 -->
     @if (selectedPlayerId > 0)
     {
-        <div class="section-title">デッキ統計</div>
-
-        @if (!filteredDecks.Any())
+        @if (playerLoading)
         {
-            <div class="empty-state">この期間のデッキ記録がありません</div>
+            <div class="loading">デッキ読み込み中...</div>
         }
         else
         {
-            <div style="display:flex; flex-direction:column; gap:8px; margin-bottom:100px;">
-                @foreach (var (deck, isActive) in filteredDecks)
-                {
-                    bool isExpanded = expandedDeckId == deck.Id;
-                    var stats = deckStatsMap.GetValueOrDefault(deck.Id);
+            <div class="section-title">デッキ統計</div>
 
-                    <div style="background:var(--surface); border:1px solid @(isActive ? "rgba(46,204,113,0.3)" : "var(--border)"); border-radius:10px; overflow:hidden;">
-                        <div style="padding:12px 14px; display:flex; align-items:center; gap:12px; cursor:pointer;"
-                             @onclick="() => ToggleDeck(deck.Id)">
-                            <div style="font-size:18px;">@(isActive ? "🟢" : "💀")</div>
-                            <div style="flex:1;">
-                                <div style="font-weight:700; font-size:14px; color:@(isActive ? "var(--text)" : "var(--text-dim)")">
-                                    @deck.Name
+            @if (!filteredDecks.Any())
+            {
+                <div class="empty-state">この期間のデッキ記録がありません</div>
+            }
+            else
+            {
+                <div style="display:flex; flex-direction:column; gap:8px; margin-bottom:100px;">
+                    @foreach (var (deck, isActive) in filteredDecks)
+                    {
+                        bool isExpanded = expandedDeckId == deck.Id;
+                        var stats = deckStatsMap.GetValueOrDefault(deck.Id);
+
+                        <div style="background:var(--surface); border:1px solid @(isActive ? "rgba(46,204,113,0.3)" : "var(--border)"); border-radius:10px; overflow:hidden;">
+                            <div style="padding:12px 14px; display:flex; align-items:center; gap:12px; cursor:pointer;"
+                                 @onclick="() => ToggleDeck(deck.Id)">
+                                <div style="font-size:18px;">@(isActive ? "🟢" : "💀")</div>
+                                <div style="flex:1;">
+                                    <div style="font-weight:700; font-size:14px; color:@(isActive ? "var(--text)" : "var(--text-dim)")">
+                                        @deck.Name
+                                    </div>
+                                    @if (stats != null)
+                                    {
+                                        <div style="font-size:11px; color:var(--text-dim); margin-top:2px;">
+                                            @stats.WinCount 勝 @stats.LoseCount 敗
+                                            @if (stats.TotalGames > 0)
+                                            {
+                                                <span style="color:@(stats.WinRate >= 50 ? "var(--win)" : "var(--lose)"); margin-left:6px; font-weight:700;">
+                                                    勝率 @stats.WinRate%
+                                                </span>
+                                            }
+                                            else
+                                            {
+                                                <span style="margin-left:6px;">試合なし</span>
+                                            }
+                                        </div>
+                                    }
                                 </div>
-                                @if (stats != null)
+                                @if (stats != null && stats.TotalGames > 0)
                                 {
-                                    <div style="font-size:11px; color:var(--text-dim); margin-top:2px;">
-                                        @stats.WinCount 勝 @stats.LoseCount 敗
-                                        @if (stats.TotalGames > 0)
-                                        {
-                                            <span style="color:@(stats.WinRate >= 50 ? "var(--win)" : "var(--lose)"); margin-left:6px; font-weight:700;">
-                                                勝率 @stats.WinRate%
-                                            </span>
-                                        }
-                                        else
-                                        {
-                                            <span style="margin-left:6px;">試合なし</span>
-                                        }
+                                    <div style="width:60px;">
+                                        <div style="background:var(--surface2); border-radius:4px; height:6px; overflow:hidden;">
+                                            <div style="width:@(stats.WinRate)%; background:@(stats.WinRate >= 50 ? "var(--win)" : "var(--lose)"); height:100%;"></div>
+                                        </div>
                                     </div>
                                 }
+                                <div style="color:var(--text-dim); font-size:12px;">@(isExpanded ? "▲" : "▼")</div>
                             </div>
-                            @if (stats != null && stats.TotalGames > 0)
+
+                            @if (isExpanded && stats != null)
                             {
-                                <div style="width:60px;">
-                                    <div style="background:var(--surface2); border-radius:4px; height:6px; overflow:hidden;">
-                                        <div style="width:@(stats.WinRate)%; background:@(stats.WinRate >= 50 ? "var(--win)" : "var(--lose)"); height:100%;"></div>
-                                    </div>
+                                <div style="border-top:1px solid var(--border); padding:12px 14px; background:var(--surface2);">
+                                    @if (stats.WinRecords.Any())
+                                    {
+                                        <div style="font-size:11px; color:var(--win); font-weight:700; margin-bottom:6px; letter-spacing:0.1em;">
+                                            ✅ 勝った試合（@stats.WinCount 回）
+                                        </div>
+                                        @foreach (var r in stats.WinRecords.OrderByDescending(x => x.PlayedAt))
+                                        {
+                                            <div style="display:flex; justify-content:space-between; align-items:center; padding:6px 10px; background:rgba(39,174,96,0.08); border:1px solid rgba(39,174,96,0.2); border-radius:6px; margin-bottom:4px;">
+                                                <div style="font-size:12px;">
+                                                    <span style="color:var(--text-dim)">@r.OpponentPlayerName</span>
+                                                    <span style="color:var(--text); margin-left:4px; font-weight:700;">@r.OpponentDeckName</span>
+                                                </div>
+                                                <div style="font-size:10px; color:var(--text-dim);">@r.PlayedAt.AddHours(9).ToString("MM/dd")</div>
+                                            </div>
+                                        }
+                                    }
+                                    @if (stats.LoseRecords.Any())
+                                    {
+                                        <div style="font-size:11px; color:var(--lose); font-weight:700; margin-bottom:6px; margin-top:@(stats.WinRecords.Any() ? "10px" : "0"); letter-spacing:0.1em;">
+                                            💀 負けた試合（@stats.LoseCount 回）
+                                        </div>
+                                        @foreach (var r in stats.LoseRecords.OrderByDescending(x => x.PlayedAt))
+                                        {
+                                            <div style="display:flex; justify-content:space-between; align-items:center; padding:6px 10px; background:rgba(192,57,43,0.08); border:1px solid rgba(192,57,43,0.2); border-radius:6px; margin-bottom:4px;">
+                                                <div style="font-size:12px;">
+                                                    <span style="color:var(--text-dim)">@r.OpponentPlayerName</span>
+                                                    <span style="color:var(--text); margin-left:4px; font-weight:700;">@r.OpponentDeckName</span>
+                                                </div>
+                                                <div style="font-size:10px; color:var(--text-dim);">@r.PlayedAt.AddHours(9).ToString("MM/dd")</div>
+                                            </div>
+                                        }
+                                    }
+                                    @if (!stats.WinRecords.Any() && !stats.LoseRecords.Any())
+                                    {
+                                        <div style="font-size:12px; color:var(--text-dim); text-align:center; padding:8px;">
+                                            この期間の試合記録がありません
+                                        </div>
+                                    }
                                 </div>
                             }
-                            <div style="color:var(--text-dim); font-size:12px;">@(isExpanded ? "▲" : "▼")</div>
                         </div>
-
-                        @if (isExpanded && stats != null)
-                        {
-                            <div style="border-top:1px solid var(--border); padding:12px 14px; background:var(--surface2);">
-                                @if (stats.WinRecords.Any())
-                                {
-                                    <div style="font-size:11px; color:var(--win); font-weight:700; margin-bottom:6px; letter-spacing:0.1em;">
-                                        ✅ 勝った試合（@stats.WinCount 回）
-                                    </div>
-                                    @foreach (var r in stats.WinRecords.OrderByDescending(x => x.PlayedAt))
-                                    {
-                                        <div style="display:flex; justify-content:space-between; align-items:center; padding:6px 10px; background:rgba(39,174,96,0.08); border:1px solid rgba(39,174,96,0.2); border-radius:6px; margin-bottom:4px;">
-                                            <div style="font-size:12px;">
-                                                <span style="color:var(--text-dim)">@r.OpponentPlayerName</span>
-                                                <span style="color:var(--text); margin-left:4px; font-weight:700;">@r.OpponentDeckName</span>
-                                            </div>
-                                            <div style="font-size:10px; color:var(--text-dim);">@r.PlayedAt.AddHours(9).ToString("MM/dd")</div>
-                                        </div>
-                                    }
-                                }
-                                @if (stats.LoseRecords.Any())
-                                {
-                                    <div style="font-size:11px; color:var(--lose); font-weight:700; margin-bottom:6px; margin-top:@(stats.WinRecords.Any() ? "10px" : "0"); letter-spacing:0.1em;">
-                                        💀 負けた試合（@stats.LoseCount 回）
-                                    </div>
-                                    @foreach (var r in stats.LoseRecords.OrderByDescending(x => x.PlayedAt))
-                                    {
-                                        <div style="display:flex; justify-content:space-between; align-items:center; padding:6px 10px; background:rgba(192,57,43,0.08); border:1px solid rgba(192,57,43,0.2); border-radius:6px; margin-bottom:4px;">
-                                            <div style="font-size:12px;">
-                                                <span style="color:var(--text-dim)">@r.OpponentPlayerName</span>
-                                                <span style="color:var(--text); margin-left:4px; font-weight:700;">@r.OpponentDeckName</span>
-                                            </div>
-                                            <div style="font-size:10px; color:var(--text-dim);">@r.PlayedAt.AddHours(9).ToString("MM/dd")</div>
-                                        </div>
-                                    }
-                                }
-                                @if (!stats.WinRecords.Any() && !stats.LoseRecords.Any())
-                                {
-                                    <div style="font-size:12px; color:var(--text-dim); text-align:center; padding:8px;">
-                                        この期間の試合記録がありません
-                                    </div>
-                                }
-                            </div>
-                        }
-                    </div>
-                }
-            </div>
+                    }
+                </div>
+            }
         }
     }
 }
@@ -163,14 +170,13 @@ else
     private List<Player> allPlayers = new();
     private List<Season> allSeasons = new();
     private Dictionary<int, List<Tournament>> tournamentMap = new();
+    private Dictionary<int, Player> playerMap = new();
 
-    // キャッシュ
+    // 選択中プレイヤーのキャッシュのみ保持
     private Dictionary<int, List<Match>> matchesByTournament = new();
     private Dictionary<int, List<Match>> matchesBySeason = new();
-    // playerId → (Deck, isActive) のリスト（大会ごとのステータスを保持）
-    private Dictionary<int, List<(Deck Deck, int TournamentId, bool IsActive)>> decksByPlayer = new();
+    private List<(Deck Deck, int TournamentId, bool IsActive)> currentPlayerDecks = new();
     private Dictionary<int, Deck> globalDeckMap = new();
-    private Dictionary<int, Player> playerMap = new();
 
     // 選択状態
     private int selectedPlayerId = 0;
@@ -183,9 +189,11 @@ else
     private Dictionary<int, DeckStats> deckStatsMap = new();
     private int expandedDeckId = 0;
     private bool loading = true;
+    private bool playerLoading = false;
 
     protected override async Task OnInitializedAsync()
     {
+        // 最小限のデータだけ取得（プレイヤー・シーズン・大会リスト）
         allPlayers = await PlayerService.GetAllAsync();
         playerMap = allPlayers.ToDictionary(p => p.Id);
         allSeasons = await SeasonService.GetAllAsync();
@@ -194,46 +202,64 @@ else
         {
             var tournaments = await TournamentService.GetBySeasonAsync(season.Id);
             tournamentMap[season.Id] = tournaments;
+        }
 
+        loading = false;
+
+        // 最初のプレイヤーを選択
+        if (allPlayers.Any())
+            await SelectPlayer(allPlayers.First().Id);
+    }
+
+    private async Task SelectPlayer(int playerId)
+    {
+        if (selectedPlayerId == playerId && currentPlayerDecks.Any()) return;
+
+        selectedPlayerId = playerId;
+        expandedDeckId = 0;
+        playerLoading = true;
+        StateHasChanged();
+
+        // 選択プレイヤーのデータを取得
+        matchesByTournament.Clear();
+        matchesBySeason.Clear();
+        currentPlayerDecks.Clear();
+        globalDeckMap.Clear();
+
+        foreach (var season in allSeasons)
+        {
             var seasonMatches = new List<Match>();
-            foreach (var t in tournaments)
+            foreach (var t in tournamentMap.GetValueOrDefault(season.Id, new()))
             {
                 var matches = await MatchService.GetTournamentMatchesAsync(t.Id);
                 matchesByTournament[t.Id] = matches;
                 seasonMatches.AddRange(matches);
 
+                // 選択プレイヤーの standings だけ取得
                 var standings = await PlayerService.GetTournamentStandingsAsync(t.Id);
-                foreach (var sp in standings)
+                var sp = standings.FirstOrDefault(s => s.PlayerId == playerId);
+                if (sp != null)
                 {
-                    // tournament_decksからデッキとステータスを取得
                     var tdPairs = await DeckService.GetTournamentDecksAsync(sp.Id);
                     foreach (var (deck, td) in tdPairs)
                     {
                         globalDeckMap[deck.Id] = deck;
-                        if (!decksByPlayer.ContainsKey(sp.PlayerId))
-                            decksByPlayer[sp.PlayerId] = new();
-
-                        // 既存エントリがなければ追加
-                        if (!decksByPlayer[sp.PlayerId].Any(x => x.Deck.Id == deck.Id && x.TournamentId == t.Id))
-                            decksByPlayer[sp.PlayerId].Add((deck, t.Id, td.IsActive));
+                        if (!currentPlayerDecks.Any(x => x.Deck.Id == deck.Id && x.TournamentId == t.Id))
+                            currentPlayerDecks.Add((deck, t.Id, td.IsActive));
                     }
+                }
+
+                // 全デッキをglobalDeckMapに追加（統計表示用）
+                foreach (var s in standings)
+                {
+                    var allDecks = await DeckService.GetAllByPlayerAsync(s.PlayerId);
+                    foreach (var d in allDecks) globalDeckMap[d.Id] = d;
                 }
             }
             matchesBySeason[season.Id] = seasonMatches;
         }
 
-        if (allPlayers.Any())
-        {
-            selectedPlayerId = allPlayers.First().Id;
-            await RefreshView();
-        }
-        loading = false;
-    }
-
-    private async Task SelectPlayer(int playerId)
-    {
-        selectedPlayerId = playerId;
-        expandedDeckId = 0;
+        playerLoading = false;
         await RefreshView();
     }
 
@@ -248,7 +274,6 @@ else
 
     private async Task RefreshView()
     {
-        // 対象試合を絞り込む
         List<Match> targetMatches;
         if (selectedFilter == "all")
             targetMatches = matchesByTournament.Values.SelectMany(x => x).ToList();
@@ -257,15 +282,11 @@ else
         else
             targetMatches = matchesByTournament.GetValueOrDefault(selectedTournamentId, new());
 
-        // デッキを絞り込む
-        var playerDecks = decksByPlayer.GetValueOrDefault(selectedPlayerId, new());
-
         List<(Deck Deck, bool IsActive)> deckList;
 
         if (selectedFilter == "all")
         {
-            // 全期間: デッキIDで重複除去、最新のステータスを使用
-            deckList = playerDecks
+            deckList = currentPlayerDecks
                 .GroupBy(x => x.Deck.Id)
                 .Select(g => (g.First().Deck, g.OrderByDescending(x => x.TournamentId).First().IsActive))
                 .ToList();
@@ -274,7 +295,7 @@ else
         {
             var seasonTournamentIds = tournamentMap.GetValueOrDefault(selectedSeasonId, new())
                 .Select(t => t.Id).ToHashSet();
-            deckList = playerDecks
+            deckList = currentPlayerDecks
                 .Where(x => seasonTournamentIds.Contains(x.TournamentId))
                 .GroupBy(x => x.Deck.Id)
                 .Select(g => (g.First().Deck, g.OrderByDescending(x => x.TournamentId).First().IsActive))
@@ -282,7 +303,7 @@ else
         }
         else
         {
-            deckList = playerDecks
+            deckList = currentPlayerDecks
                 .Where(x => x.TournamentId == selectedTournamentId)
                 .GroupBy(x => x.Deck.Id)
                 .Select(g => (g.First().Deck, g.First().IsActive))
@@ -294,7 +315,6 @@ else
             .ThenBy(x => x.Deck.Name)
             .ToList();
 
-        // 統計計算
         deckStatsMap.Clear();
         foreach (var (deck, _) in filteredDecks)
         {
