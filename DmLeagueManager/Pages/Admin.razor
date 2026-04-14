@@ -243,6 +243,8 @@
     private bool importLoading = false;
     private BackupData? importPreview;
 
+    private string? importJson;
+
     protected override async Task OnInitializedAsync() => await LoadData();
 
     private async Task LoadData()
@@ -280,31 +282,8 @@
         backupLoading = true;
         try
         {
-            var players = (await supabase.From<Player>().Get()).Models;
-            var seasons = (await supabase.From<Season>().Get()).Models;
-            var tournaments = (await supabase.From<Tournament>().Get()).Models;
-            var seasonPlayers = (await supabase.From<SeasonPlayer>().Get()).Models;
-            var decks = (await supabase.From<Deck>().Get()).Models;
-            var tournamentDecks = (await supabase.From<TournamentDeck>().Get()).Models;
-            var matches = (await supabase.From<Match>().Get()).Models;
-            var bannedCards = (await supabase.From<BannedCard>().Get()).Models;
-
-            var backup = new
-            {
-                Players = players.Select(p => new { p.Id, p.Name, p.CreatedAt }),
-                Seasons = seasons.Select(s => new { s.Id, s.Name, s.Status, s.DeckCount, s.RankPoints, s.CreatedAt }),
-                Tournaments = tournaments.Select(t => new { t.Id, t.SeasonId, t.Name, t.DeckCount, t.Status, t.CreatedAt }),
-                SeasonPlayers = seasonPlayers.Select(sp => new { sp.Id, sp.SeasonId, sp.TournamentId, sp.PlayerId, sp.RemainingDecks, sp.WinCount, sp.LoseCount, sp.Rank, sp.TotalPoints, sp.InitialPoints, sp.CreatedAt }),
-                Decks = decks.Select(d => new { d.Id, d.PlayerId, d.Name, d.CreatedAt }),
-                TournamentDecks = tournamentDecks.Select(td => new { td.Id, td.SeasonPlayerId, td.DeckId, td.Status, td.CreatedAt }),
-                Matches = matches.Select(m => new { m.Id, m.SeasonId, m.TournamentId, m.WinnerPlayerId, m.LoserPlayerId, m.WinnerDeckId, m.LostDeckId, m.FirstPlayerId, m.MatchIndex, m.Memo, m.PlayedAt }),
-                BannedCards = bannedCards.Select(b => new { b.Id, b.SeasonId, b.CardName, b.CreatedAt }),
-            };
-
-            var json = System.Text.Json.JsonSerializer.Serialize(backup, new System.Text.Json.JsonSerializerOptions
-            {
-                WriteIndented = true
-            });
+            var result = await supabase.Rpc("export_all_data", null);
+            var json = result.Content ?? "{}";
 
             var fileName = $"dm_backup_{DateTime.Now:yyyyMMdd_HHmmss}.json";
             await JS.InvokeVoidAsync("downloadFile", fileName, "application/json", json);
@@ -341,14 +320,16 @@
     private async Task OnFileSelected(InputFileChangeEventArgs e)
     {
         importPreview = null;
+        importJson = null;
         errorMessage = null;
         try
         {
             var file = e.File;
             using var stream = file.OpenReadStream(10 * 1024 * 1024);
             using var reader = new System.IO.StreamReader(stream);
-            var json = await reader.ReadToEndAsync();
-            importPreview = System.Text.Json.JsonSerializer.Deserialize<BackupData>(json,
+            importJson = await reader.ReadToEndAsync(); // JSONをそのまま保持
+
+            importPreview = System.Text.Json.JsonSerializer.Deserialize<BackupData>(importJson,
                 new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
             StateHasChanged();
         }
@@ -357,23 +338,32 @@
 
     private async Task ImportBackup()
     {
-        if (importPreview == null) return;
+        if (importPreview == null || importJson == null) return;
         importLoading = true;
+        StateHasChanged(); // ← 追加
         try
         {
-            var json = System.Text.Json.JsonSerializer.Serialize(importPreview, new System.Text.Json.JsonSerializerOptions
-            {
-                WriteIndented = false
-            });
 
-            await supabase.Rpc("import_all_data", new { p_json = json });
-
+            // 文字列をjsonbオブジェクトとして渡す
+            var jsonObj = System.Text.Json.JsonDocument.Parse(importJson).RootElement;
+            var result = await supabase.Rpc("import_all_data", new { p_json = importJson });
+            message = $"復元: {result.Content}";
+            StateHasChanged();
+            await Task.Delay(3000);
             importPreview = null;
-            message = "復元が完了しました";
-            await LoadData();
+            importJson = null;
+            StateHasChanged(); // ← 追加
         }
-        catch (Exception ex) { errorMessage = $"復元エラー: {ex.Message}"; }
-        finally { importLoading = false; }
+        catch (Exception ex)
+        {
+            errorMessage = $"復元エラー: {ex.Message}";
+            StateHasChanged(); // ← 追加
+        }
+        finally
+        {
+            importLoading = false;
+            StateHasChanged(); // ← 追加
+        }
     }
 
     // ============================================
